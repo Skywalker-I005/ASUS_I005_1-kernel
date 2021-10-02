@@ -379,7 +379,7 @@ const u32 default_rt1715_src_caps[] = { 0x00019032 };	/* 5V, 500 mA */
 int default_rt1715_src_caps_size = ARRAY_SIZE(default_rt1715_src_caps);
 //[---] Add the PDO of source for RT1715
 
-bool side_port_cc_status;
+bool side_port_cc_status = false;
 
 void monitor_charging_enable(void);
 int asus_set_vbus_attached_status(int value);

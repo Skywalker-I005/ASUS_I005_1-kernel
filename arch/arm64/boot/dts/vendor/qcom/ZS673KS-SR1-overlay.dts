@@ -31,8 +31,8 @@
 	qcom,ulps-enabled;
 
 	// enable esd check
-	//qcom,esd-check-enabled;
-	//qcom,mdss-dsi-panel-status-check-mode = "te_signal_check";
+	qcom,esd-check-enabled;
+	qcom,mdss-dsi-panel-status-check-mode = "te_signal_check";
 
 	qcom,dsi-select-clocks = "mux_byte_clk0", "mux_pixel_clk0";
 	qcom,mdss-dsi-display-timings {
@@ -100,8 +100,8 @@
 	qcom,ulps-enabled;
 
 	// enable esd check
-	//qcom,esd-check-enabled;
-	//qcom,mdss-dsi-panel-status-check-mode = "te_signal_check";
+	qcom,esd-check-enabled;
+	qcom,mdss-dsi-panel-status-check-mode = "te_signal_check";
 
 	qcom,dsi-select-clocks = "mux_byte_clk0", "mux_pixel_clk0";
 	qcom,mdss-dsi-display-timings {

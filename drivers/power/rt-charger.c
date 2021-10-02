@@ -133,6 +133,32 @@ struct rt1715_rdo_resp_msg {
 	u32 bPPSSelected;
 };
 
+int rt_chg_get_remote_cc(void) {
+    struct tcpc_device *tcpc;
+    int result, cc1, cc2;
+    tcpc = tcpc_dev_get_by_name("type_c_port0");
+
+	if (tcpci_get_cc(tcpc) < 0)
+	{
+		result = -1;
+		pr_info("%s get CC status fail result = %d\n", __func__, result);
+	}
+	else {
+		cc1 = tcpc->typec_remote_cc[0];
+		cc2 = tcpc->typec_remote_cc[1];
+		if (cc1 > 0 && cc2 <=0)
+			result = 1;
+		else if (cc2 > 0 && cc1 <=0)
+			result = 2;
+		else
+			result = 0;
+		pr_info("%s CC1/CC2 status: %d/%d result = %d\n", __func__, cc1, cc2, result);
+	}
+
+    return result;
+}
+EXPORT_SYMBOL(rt_chg_get_remote_cc);
+
 bool rt_chg_check_asus_vid(void) {
 	pr_info("%s: vid = 0x%04x, vid_ext = 0x%04x\n", __func__, vid, vid_ext);
 	if(vid==2821 || vid_ext==2821)
