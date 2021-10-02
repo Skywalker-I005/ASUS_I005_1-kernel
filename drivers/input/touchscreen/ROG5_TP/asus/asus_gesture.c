@@ -86,7 +86,7 @@ void asus_gesture_report(struct fts_ts_data *ts_data, int gesture_id)
     bool proxy_skip = false;
     unsigned int time_delta;
     
-    FTS_DEBUG("gesture_id:0x%x", gesture_id);      
+    FTS_DEBUG("gesture_id:0x%x , fp_report_type %d", gesture_id,ts_data-> fp_report_type);      
 
     if (ts_data->phone_call_state == ENABLE) {
 	proxy_status = proximityStatus();

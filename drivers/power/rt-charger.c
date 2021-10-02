@@ -133,6 +133,13 @@ struct rt1715_rdo_resp_msg {
 	u32 bPPSSelected;
 };
 
+/*
+ * rt_chg_get_remote_cc return
+ * -1 : query fail
+ *  0 : unattach
+ *  1 : attach SNK
+ *  2 : attach SRC
+ * */
 int rt_chg_get_remote_cc(void) {
     struct tcpc_device *tcpc;
     int result, cc1, cc2;
@@ -146,10 +153,18 @@ int rt_chg_get_remote_cc(void) {
 	else {
 		cc1 = tcpc->typec_remote_cc[0];
 		cc2 = tcpc->typec_remote_cc[1];
-		if (cc1 > 0 && cc2 <=0)
-			result = 1;
-		else if (cc2 > 0 && cc1 <=0)
-			result = 2;
+		if (cc1 > 0 && cc2 <=0){
+			if (cc1 <= TYPEC_CC_VOLT_RD)
+				result = 2;
+			else
+				result = 1;
+		}
+		else if (cc2 > 0 && cc1 <=0){
+			if (cc2 <= TYPEC_CC_VOLT_RD)
+				result = 2;
+			else
+				result = 1;
+		}
 		else
 			result = 0;
 		pr_info("%s CC1/CC2 status: %d/%d result = %d\n", __func__, cc1, cc2, result);

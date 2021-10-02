@@ -574,18 +574,20 @@ static int fts_input_report_b(struct fts_ts_data *data)
 		    }
 		}
 	    } else {
-		input_mt_report_slot_state(data->input_dev, MT_TOOL_FINGER, true);
-		if (data->realtime == 1) { 
-		    input_set_timestamp(data->input_dev, events[i].time);
-		}
-		input_report_abs(data->input_dev, ABS_MT_TOUCH_MAJOR, events[i].p);
-		input_report_abs(data->input_dev, ABS_MT_POSITION_X, events[i].x);
-		input_report_abs(data->input_dev, ABS_MT_POSITION_Y, events[i].y);
-	        data->finger_press = true;
+	        if (!fts_data->wait_reset){
+		    input_mt_report_slot_state(data->input_dev, MT_TOOL_FINGER, true);
+		    if (data->realtime == 1) { 
+			input_set_timestamp(data->input_dev, events[i].time);
+		    }
+		    input_report_abs(data->input_dev, ABS_MT_TOUCH_MAJOR, events[i].p);
+		    input_report_abs(data->input_dev, ABS_MT_POSITION_X, events[i].x);
+		    input_report_abs(data->input_dev, ABS_MT_POSITION_Y, events[i].y);
+		    data->finger_press = true;
 		
-		// ATR
-		if (is_atr_empty() == 1) {
-		    report_atr(events[i].time);
+		  // ATR
+		    if (is_atr_empty() == 1) {
+			report_atr(events[i].time);
+		    }
 		}
 	    }
 
@@ -606,11 +608,13 @@ static int fts_input_report_b(struct fts_ts_data *data)
 		}
 	    }
         } else {
-            uppoint++;
-	    input_mt_report_slot_state(data->input_dev, MT_TOOL_FINGER, false);	    
-	    data->touchs &= ~BIT(events[i].id);
-	    if (data->log_level >= 1) {
+	    if (!fts_data->wait_reset){
+		uppoint++;
+		input_mt_report_slot_state(data->input_dev, MT_TOOL_FINGER, false);	    
+		data->touchs &= ~BIT(events[i].id);
+		if (data->log_level >= 1) {
 		    FTS_DEBUG("[B]id %d UP !", events[i].id);
+		}
 	    }
 	    
     	    if ((fp_press!=0) && (events[i].id == fp_key_i)) {
@@ -628,13 +632,15 @@ static int fts_input_report_b(struct fts_ts_data *data)
     if (unlikely(data->touchs ^ touchs)) {
         for (i = 0; i < max_touch_num; i++)  {
             if (BIT(i) & (data->touchs ^ touchs)) {
-                if (data->log_level >= 1) {
-                    FTS_DEBUG("[B]id %d UP!", i);
-                }
-                va_reported = true;
-		input_mt_slot(data->input_dev, i);
-		input_set_timestamp(data->input_dev, ktime_get());		
-		input_mt_report_slot_state(data->input_dev, MT_TOOL_FINGER, false);
+	        if (!fts_data->wait_reset){
+		    if (data->log_level >= 1) {
+			FTS_DEBUG("[B]id %d UP!", i);
+		    }
+		    va_reported = true;
+		    input_mt_slot(data->input_dev, i);
+		    input_set_timestamp(data->input_dev, ktime_get());		
+		    input_mt_report_slot_state(data->input_dev, MT_TOOL_FINGER, false);
+		}
             }
         }
     }
@@ -643,21 +649,22 @@ static int fts_input_report_b(struct fts_ts_data *data)
     if (va_reported) {
         /* touchs==0, there's no point but key */
         if (EVENT_NO_DOWN(data) || (!touchs)) {
-            if (data->log_level >= 1) {
-                FTS_DEBUG("[B]Points All Up!");
-            }
             data->finger_press = false;
 	    
             if (!data->atr_press) {
-	      input_report_key(data->input_dev, BTN_TOUCH, 0);
-	      FTS_INFO("touch up");
+	      if (!fts_data->wait_reset){
+		  FTS_DEBUG("[B]Points All Up!");		
+		  input_report_key(data->input_dev, BTN_TOUCH, 0);
+	      }
 	      fp_press = 0;
 	      data->fp_filter = false;
 	      if (fts_data->wait_reset){
+		fts_data->wait_reset = false;
 		FTS_INFO("reset tp");
 		fts_irq_disable();
 		fts_reset_proc(150);
 		report_rate_recovery(data);
+		fts_ex_fun_recovery(data);
 		fts_irq_enable();
 	      }
 /*	      if (data->perftime == 1) {
@@ -675,8 +682,8 @@ static int fts_input_report_b(struct fts_ts_data *data)
 		  first_down = true;
 		  FTS_INFO("touch down");
 	      }
-	      if (!data->fp_filter)
-		  input_report_key(data->input_dev, BTN_TOUCH, 1);	     
+	      if (!data->fp_filter) {
+		  input_report_key(data->input_dev, BTN_TOUCH, 1);}
 	    }
         }
     }
@@ -883,6 +890,8 @@ static int fts_read_parse_touchdata(struct fts_ts_data *data)
 	fts_irq_disable();
 	fts_reset_proc(150);
 	report_rate_recovery(data);
+	asus_game_recovery(data);
+	fts_ex_fun_recovery(data);
 	fts_irq_enable();
 	
         return -EIO;

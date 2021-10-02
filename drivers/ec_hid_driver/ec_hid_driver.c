@@ -1264,18 +1264,66 @@ kmalloc_failed:
 
 static int ec_hid_remove(struct platform_device *pdev)
 {
+	int ret;
+
 	printk("[EC_HID] ec_hid_remove.\n");
+
+	if (gDongleType == Dongle_BackCover) {
+		if (regulator_enabled) {
+			printk("[EC_HID] ec_hid_remove: disable usb2_mux2_en regulator\n");
+			ret = regulator_disable(regulator_vdd);
+			if (ret)
+				printk("[EC_HID] Failed to disable regulator vdda33\n");
+				
+			regulator_enabled = false;
+		}
+	}
 
 	return 0;
 }
 
 int ec_hid_suspend(struct device *dev)
 {
+	int ret;
+	
+	if (gDongleType == Dongle_BackCover) {
+		if (regulator_enabled) {
+			printk("[EC_HID] ec_hid_suspend: disable usb2_mux2_en regulator\n");
+			ret = regulator_disable(regulator_vdd);
+			if (ret)
+				printk("[EC_HID] Failed to disable regulator vdda33\n");
+				
+			regulator_enabled = false;
+		}
+	}
+
 	return 0;
 }
 
 int ec_hid_resume(struct device *dev)
 {
+
+	int ret;
+	
+	if (gDongleType == Dongle_BackCover) {
+		if (!regulator_enabled) {
+			printk("[EC_HID] ec_hid_resume: enable usb2_mux2_en regulator\n");
+			regulator_enabled = true;
+			
+			ret = regulator_set_voltage(regulator_vdd, 3000000, 3300000);
+			if (ret < 0)
+				printk("[EC_HID] Failed to set regulator voltage\n");
+
+			ret = regulator_set_load(regulator_vdd, 150000);
+			if (ret < 0)
+				printk("[EC_HID] Failed to set regulator current\n");
+			
+			ret = regulator_enable(regulator_vdd);
+			if (ret)
+				printk("[EC_HID] Failed to enable regulator vdda33\n");
+		}
+	}
+
 	return 0;
 }
 

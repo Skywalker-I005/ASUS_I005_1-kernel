@@ -35,9 +35,9 @@
 
 #define ATR_QUEUE_SIZE 16
 
-#define REPORT_RATE_1                       120
-#define REPORT_RATE_2                       300
-#define REPORT_RATE_3                       560
+#define REPORT_RATE_0                       120
+#define REPORT_RATE_1                       300
+#define REPORT_RATE_2                       560
 
 #define FTS_REG_TOUCH_ID                    0x02
 #define FTS_REG_TOUCH_MODE                  0xA5

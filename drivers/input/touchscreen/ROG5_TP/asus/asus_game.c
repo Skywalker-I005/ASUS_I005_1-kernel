@@ -237,7 +237,7 @@ void set_report_rate () {
     int ret = 0 , i = 0;
     u8 rate = 0;
     
-    if (fts_data->report_rate == REPORT_RATE_1) {
+    if (fts_data->report_rate == REPORT_RATE_0) {
 	mutex_lock(&fts_data->reg_lock);      
 	for (i = 0; i < 6; i++) {
 	    ret = fts_write_reg(FTS_REG_REPORT_RATE, 0x00);
@@ -247,15 +247,16 @@ void set_report_rate () {
 	      FTS_DEBUG("set report rate to 120Hz fail rate 0x%X , retry %d",rate, i);
 	      msleep(20);
 	    } else {
-      	      ts_data->report_rate = REPORT_RATE_1;
+      	      ts_data->report_rate = REPORT_RATE_0;
 	      FTS_DEBUG("set report rate to 120Hz rate %X",rate);
 	      break;
 	    }
 	}
 	mutex_unlock(&fts_data->reg_lock);
+	return;
     }
     
-    if (fts_data->report_rate == REPORT_RATE_2) {
+    if (fts_data->report_rate == REPORT_RATE_1) {
 	mutex_lock(&fts_data->reg_lock);      
 	for (i = 0; i < 6; i++) {
 	    ret = fts_write_reg(FTS_REG_REPORT_RATE, 0x1C);
@@ -265,16 +266,17 @@ void set_report_rate () {
 	      FTS_DEBUG("set report rate to 300Hz fail rate 0x%X , retry %d",rate, i);
 	      msleep(20);
 	    } else {
-      	      ts_data->report_rate = REPORT_RATE_2;
+      	      ts_data->report_rate = REPORT_RATE_1;
 	      FTS_DEBUG("set report rate to 300Hz rate %X",rate);
 	      break;
 	    }
 	}
 	mutex_unlock(&fts_data->reg_lock);
+	return;
     } 
 
     
-    if (fts_data->report_rate == REPORT_RATE_3) {
+    if (fts_data->report_rate == REPORT_RATE_2) {
 	mutex_lock(&fts_data->reg_lock);      
 	for (i = 0; i < 6; i++) {
 	    ret = fts_write_reg(FTS_REG_REPORT_RATE_600, 0x01);
@@ -284,12 +286,13 @@ void set_report_rate () {
 	      FTS_DEBUG("set report rate to 560Hz fail rate 0x%X , retry %d",rate, i);
 	      msleep(20);
 	    } else {
-      	      ts_data->report_rate = REPORT_RATE_3;
+      	      ts_data->report_rate = REPORT_RATE_2;
 	      FTS_DEBUG("set report rate to 560Hz rate %X",rate);
 	      break;
 	    }
 	}
 	mutex_unlock(&fts_data->reg_lock);
+	return;
     }      
 }
 
@@ -634,13 +637,25 @@ static ssize_t fts_game_mode_store(
     if (FTS_SYSFS_ECHO_ON(buf)) {
         if (!ts_data->game_mode) {
             FTS_DEBUG("enter game mode");
-            ts_data->game_mode = ENABLE;    
+            ts_data->game_mode = ENABLE;
+	    if (ts_data->power_saving_mode) {
+		FTS_DEBUG("system under power saving mode, rise report rate for game");
+		fts_data->report_rate = REPORT_RATE_1; //300Hz
+		fts_data->pre_report_rate =1;
+		set_report_rate();
+	    }
         }
     } else if (FTS_SYSFS_ECHO_OFF(buf)) {
         if (ts_data->game_mode) {
             FTS_DEBUG("exit game mode");
             ts_data->game_mode = DISABLE;
 	    fts_data->edge_palm_enable = 2;
+	    if (ts_data->power_saving_mode) {
+		FTS_DEBUG("system under power saving mode, decrease report rate for game");
+		fts_data->report_rate = REPORT_RATE_0; //120Hz
+		fts_data->pre_report_rate =0;
+		set_report_rate();
+	    }
         }
     }
 
@@ -800,20 +815,28 @@ static ssize_t rise_report_rate_store(
 {  
         bool reconfig = false;
 	if (buf[0] == '0') {
-	  if (pre_report_rate != 0)
-	      reconfig = true;	  
-	  fts_data->report_rate = REPORT_RATE_1; //120Hz
-	  pre_report_rate = 0;
+	  if (fts_data->pre_report_rate != 0)
+	      reconfig = true;
+  	  if(fts_data->game_mode) {
+	      fts_data->report_rate = REPORT_RATE_1; //300Hz
+	      fts_data->pre_report_rate = 1;
+	  }  else {
+	      fts_data->report_rate = REPORT_RATE_0; //120Hz
+	      fts_data->pre_report_rate = 0;
+	  }
+	  fts_data->power_saving_mode = true;
 	} else if (buf[0] == '1') {
-  	  if (pre_report_rate != 1)
+  	  if (fts_data->pre_report_rate != 1)
 	      reconfig = true;	  
-	  fts_data->report_rate = REPORT_RATE_2; //300Hz
-	  pre_report_rate =1;
+	  fts_data->report_rate = REPORT_RATE_1; //300Hz
+	  fts_data->power_saving_mode = false;
+	  fts_data->pre_report_rate =1;
 	} else if (buf[0] == '2') {
-	  if (pre_report_rate != 2)
+	  if (fts_data->pre_report_rate != 2)
 	      reconfig = true;	  
-	  fts_data->report_rate = REPORT_RATE_3;//560Hz
-	  pre_report_rate = 2;
+	  fts_data->report_rate = REPORT_RATE_2;//560Hz
+	  fts_data->power_saving_mode = false;
+	  fts_data-> pre_report_rate = 2;
 	}
   
     if (reconfig)  
@@ -906,12 +929,13 @@ void asus_game_recovery(struct fts_ts_data *ts_data)
 void report_rate_recovery(struct fts_ts_data *ts_data) 
 {
     FTS_INFO("reconfig with report rate %d",fts_data->report_rate);
-    if (fts_data->report_rate ==REPORT_RATE_1) 
+    if ((fts_data->report_rate == REPORT_RATE_0)||(fts_data->report_rate == REPORT_RATE_1)) 
         set_report_rate();
-    if (fts_data->report_rate ==REPORT_RATE_3) {
-        fts_data->report_rate = REPORT_RATE_2;
+    
+    if (fts_data->report_rate == REPORT_RATE_2) {
+        fts_data->report_rate = REPORT_RATE_1;
         set_report_rate();
-	fts_data->report_rate = REPORT_RATE_3;
+	fts_data->report_rate = REPORT_RATE_2;
 	set_report_rate();
     }
 }
@@ -931,8 +955,9 @@ int asus_game_create_sysfs(struct fts_ts_data *ts_data)
     
     ts_data->game_mode = DISABLE;
     ts_data->rotation_angle = 0;
-    ts_data->report_rate = REPORT_RATE_2;
+    ts_data->report_rate = REPORT_RATE_1;
     fts_data->edge_palm_enable = 2;
+    fts_data->pre_report_rate = 1;
     
     atr_buf_queue = atr_buf_init(ATR_QUEUE_SIZE);
     

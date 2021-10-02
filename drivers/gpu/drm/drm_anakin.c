@@ -5,6 +5,7 @@
 
 #include <linux/device.h>
 #include <drm/drm_anakin.h>
+#include <linux/delay.h>
 
 #if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT
 static int g_hdr = 0;
@@ -73,6 +74,9 @@ void anakin_drm_notify(int var, int value)
 	} else {
 		pr_err("[Display] update variable type %d from %d to %d\n", var, *selected_var, value);
 		*selected_var = value;
+		if ((var == ASUS_NOTIFY_SPOT_READY) && (value == 1)) {
+			mdelay(17);
+		}
 		sysfs_notify(asus_class_get_kobj(drm_class), NULL, selected_var_name);
 	}
 }

@@ -912,7 +912,7 @@ static int usb_psy_get_prop(struct power_supply *psy,
 		// pval->intval = DIV_ROUND_CLOSEST((int)pval->intval, 10);
 	if (prop == POWER_SUPPLY_PROP_ONLINE && pval->intval == 0) {	// ASUS BSP: set online = 1 when feature usbin_suspend with cable
 		get_cc_status_from_ADSP();
-		if (side_port_cc_status || rt_chg_get_remote_cc()) {
+		if (side_port_cc_status || (rt_chg_get_remote_cc() == 1)) {
 			pr_err("[BAT][CHG] USB_ONLINE=0, but side_cc=%d, btm_cc=%d\n", side_port_cc_status, rt_chg_get_remote_cc());
 			pval->intval = 1;
 		} else if (g_vbus_plug && (feature_stop_chg_flag | g_once_usb_thermal_btm | g_once_usb_thermal_side)) {

@@ -1818,12 +1818,15 @@ static void handle_notification(struct battery_chg_dev *bcdev, void *data,
                 break;
                 case ASUS_CHARGER_TYPE_LEVEL1:
                     g_SWITCH_LEVEL = SWITCH_LEVEL2_QUICK_CHARGING;
+                    set_qc_stat(POWER_SUPPLY_STATUS_CHARGING);
                 break;
                 case ASUS_CHARGER_TYPE_LEVEL2:
                     g_SWITCH_LEVEL = SWITCH_LEVEL3_QUICK_CHARGING;
+                    set_qc_stat(POWER_SUPPLY_STATUS_CHARGING);
                 break;
                 case ASUS_CHARGER_TYPE_LEVEL3:
                     g_SWITCH_LEVEL = SWITCH_LEVEL4_QUICK_CHARGING;
+                    set_qc_stat(POWER_SUPPLY_STATUS_CHARGING);
                 break;
 				default:
 					g_SWITCH_LEVEL = SWITCH_LEVEL0_DEFAULT;
@@ -1929,6 +1932,8 @@ static void handle_message(struct battery_chg_dev *bcdev, void *data,
 			if(ChgPD_Info.BATT_ID < 51000*1.15 && ChgPD_Info.BATT_ID > 51000*0.85)
 				asus_extcon_set_state_sync(bat_id_extcon, 1);
 			else if(ChgPD_Info.BATT_ID < 100000*1.15 && ChgPD_Info.BATT_ID > 100000*0.85)
+				asus_extcon_set_state_sync(bat_id_extcon, 1);
+			else if(ChgPD_Info.BATT_ID < 10000*1.15 && ChgPD_Info.BATT_ID > 10000*0.85)
 				asus_extcon_set_state_sync(bat_id_extcon, 1);
 			else
 				asus_extcon_set_state_sync(bat_id_extcon, 0);

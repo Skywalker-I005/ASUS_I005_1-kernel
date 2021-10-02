@@ -215,6 +215,8 @@ struct fts_ts_data {
     int perftime;
     struct workqueue_struct *init_workqueue;
     struct work_struct init_work;
+    bool power_saving_mode;
+    int pre_report_rate;
 //fod
     bool fp_enable;
     int fp_report_type;
