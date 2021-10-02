@@ -712,7 +712,7 @@ static void grip_sense2_setting(bool flag){
 /* ASUS BSP Clay: ---*/
 
 static void grip_set_game_gesture_sysp(bool flag){
-	const char *buf_on = "110 1\n";
+	const char *buf_on = "110 6\n";
 	const char *buf_off = "110 0\n";
 	const char *buf_swipe_on = "110 4\n";
 	static bool status = false;
@@ -746,7 +746,7 @@ static void grip_slide_swipe_status_check(void){
 	uint16_t boost_addr = 0x3d;
 	static int swipe_status = 0, gesture_status = 0, slide_status = 0;
 	const char *swipe_buf_on = "110 4\n";
-	const char *slide_buf_on = "110 1\n";
+	const char *slide_buf_on = "110 6\n";
 	const char *buf_off = "110 0\n";
 	
 	if(grip_status_g->G_SLIDE_EN[0] == 1 || grip_status_g->G_SLIDE_EN[1] == 1
