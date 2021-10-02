@@ -622,11 +622,13 @@ static ssize_t fts_game_mode_show (struct device *dev, struct device_attribute *
     int count = 0;
     struct fts_ts_data *ts_data = fts_data;
     struct input_dev *input_dev = ts_data->input_dev;
-
+    u8 value = 0x0;
+    
     mutex_lock(&input_dev->mutex);
     
-    count = snprintf(buf + count, PAGE_SIZE, "Game Mode:%s\n",
-                     ts_data->game_mode ? "On" : "Off");
+    fts_read_reg(FTS_REG_GMAE_MODE, &value);
+    count = snprintf(buf + count, PAGE_SIZE, "Game mode reg 0x%x Game Mode:%s\n",
+                     value,ts_data->game_mode ? "On" : "Off");
     mutex_unlock(&input_dev->mutex);
 
     return count;
@@ -636,10 +638,12 @@ static ssize_t fts_game_mode_store(
     struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
 {
     struct fts_ts_data *ts_data = fts_data;
+    int ret;
     if (FTS_SYSFS_ECHO_ON(buf)) {
         if (!ts_data->game_mode) {
             FTS_DEBUG("enter game mode");
             ts_data->game_mode = ENABLE;
+	    ret = fts_write_reg(FTS_REG_GMAE_MODE, 0x01);
 	    if (ts_data->power_saving_mode) {
 		FTS_DEBUG("system under power saving mode, rise report rate for game");
 		fts_data->report_rate = REPORT_RATE_1; //300Hz
@@ -651,6 +655,7 @@ static ssize_t fts_game_mode_store(
         if (ts_data->game_mode) {
             FTS_DEBUG("exit game mode");
             ts_data->game_mode = DISABLE;
+	    ret = fts_write_reg(FTS_REG_GMAE_MODE, 0x00);
 	    fts_data->edge_palm_enable = 2;
 	    if (ts_data->power_saving_mode) {
 		FTS_DEBUG("system under power saving mode, decrease report rate for game");
@@ -920,12 +925,17 @@ static struct attribute_group asus_game_attribute_group = {
 
 void asus_game_recovery(struct fts_ts_data *ts_data) 
 {
-    set_rotation_mode();
-    reconfig_game_reg(true);
-    if (wait_resume) {
+    int ret;
+    if (ts_data->game_mode == ENABLE) {
+      set_rotation_mode();
+      ret = fts_write_reg(FTS_REG_GMAE_MODE, 0x01);
+      if (wait_resume) {
 	FTS_INFO("Game mode setting recovery");
 	set_edge_palm();
+      }
     }
+    
+    reconfig_game_reg(true);
 }
 
 void report_rate_recovery(struct fts_ts_data *ts_data) 

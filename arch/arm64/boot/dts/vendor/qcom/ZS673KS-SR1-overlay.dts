@@ -283,7 +283,6 @@
 		pinctrl-names = "fp_default";
 		pinctrl-0 = <&fp_irq_default &fp_reset_default>;
 		status = "okay";
-		panel = <&dsi_ams667uu07_fhd_plus_dsc_cmd &dsi_ams678_fhd_plus_dsc_cmd &dsi_ams678_er2_fhd_plus_dsc_cmd>;
  	};
 
 	//Disable qcom default FP setting

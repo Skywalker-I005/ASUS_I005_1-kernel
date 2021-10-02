@@ -43,6 +43,7 @@
 #define FTS_REG_TOUCH_MODE                  0xA5
 #define FTS_REG_PALM                        0xE5
 #define FTS_REG_ILLEGAL_GESTURE             0xE6
+#define FTS_REG_GMAE_MODE                   0xE7
 
 #define ASUS_TOUCH_X_1_POS                   3
 #define ASUS_TOUCH_X_2_POS                   4
