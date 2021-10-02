@@ -110,6 +110,7 @@ void asus_gesture_report(struct fts_ts_data *ts_data, int gesture_id)
     case GESTURE_F:
 	if ((ts_data->fp_enable == 1) && (ts_data-> fp_report_type!=0)) {
 	  FTS_INFO("key F");
+	  fts_data->fp_filter = true;
 #if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT    
 	  /* ASUS BSP Display +++ */
 	  anakin_drm_notify(ASUS_NOTIFY_FOD_TOUCHED, 1);
@@ -124,6 +125,7 @@ void asus_gesture_report(struct fts_ts_data *ts_data, int gesture_id)
     case GESTURE_U:
         if ((ts_data->fp_enable == 1) && (ts_data-> fp_report_type!=0)) {
 	  FTS_INFO("key U");
+	  fts_data->fp_filter = false;
 	  gesture = KEY_GESTURE_U;
 	  ts_data->next_resume_isaod = false;
 	  proxy_skip = true;

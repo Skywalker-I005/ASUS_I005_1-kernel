@@ -9518,6 +9518,94 @@ static void ufshcd_add_ufs_status_sysfs_nodes(struct ufs_hba *hba)
 		dev_err(hba->dev, "Failed to create sysfs for ufs_status_attr\n");
 }
 
+#if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT
+static ssize_t ufshcd_rx_Mbps_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct ufs_hba *hba = dev_get_drvdata(dev);
+	uint16_t rateA[4] = { 1248, 2496, 4992, 9984 };//hs gear 1~4
+	uint16_t rateB[4] = { 1457, 2915, 5830, 11660 };//hs gear 1~4
+	uint16_t rx_Mbps = 0;
+	int curr_len;
+
+ switch (hba->pwr_info.hs_rate)
+ {
+	case PA_HS_MODE_A:
+		rx_Mbps = rateA[hba->pwr_info.gear_rx - 1] * hba->pwr_info.lane_rx;
+		curr_len = snprintf(buf, PAGE_SIZE, "%d\n", rx_Mbps);
+		break;
+	case PA_HS_MODE_B:
+		rx_Mbps = rateB[hba->pwr_info.gear_rx - 1] * hba->pwr_info.lane_rx;
+		curr_len = snprintf(buf, PAGE_SIZE, "%d\n", rx_Mbps);
+		break;
+	default:
+		curr_len = snprintf(buf, PAGE_SIZE, "unknow\n");
+		break;
+}
+	return curr_len;
+}
+
+static ssize_t ufshcd_rx_Mbps_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	return count;
+}
+
+static void ufshcd_add_rx_Mbps_sysfs_nodes(struct ufs_hba *hba)
+{
+	hba->rx_Mbps_attr.show = ufshcd_rx_Mbps_show;
+	hba->rx_Mbps_attr.store = ufshcd_rx_Mbps_store;
+	sysfs_attr_init(&hba->rx_Mbps_attr.attr);
+	hba->rx_Mbps_attr.attr.name = "rx_Mbps";
+	hba->rx_Mbps_attr.attr.mode = S_IRUGO | S_IWUSR;
+	if (device_create_file(hba->dev, &hba->rx_Mbps_attr))
+		dev_err(hba->dev, "Failed to create sysfs for rx_Mbps_attr\n");
+}
+
+static ssize_t ufshcd_tx_Mbps_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct ufs_hba *hba = dev_get_drvdata(dev);
+	uint16_t rateA[4] = { 1248, 2496, 4992, 9984 };//hs gear 1~4
+	uint16_t rateB[4] = { 1457, 2915, 5830, 11660 };//hs gear 1~4
+	uint16_t tx_Mbps = 0;
+	int curr_len;
+
+ switch (hba->pwr_info.hs_rate)
+ {
+	case PA_HS_MODE_A:
+		tx_Mbps = rateA[hba->pwr_info.gear_tx - 1] * hba->pwr_info.lane_tx;
+		curr_len = snprintf(buf, PAGE_SIZE, "%d\n", tx_Mbps);
+		break;
+	case PA_HS_MODE_B:
+		tx_Mbps = rateB[hba->pwr_info.gear_tx - 1] * hba->pwr_info.lane_tx;
+		curr_len = snprintf(buf, PAGE_SIZE, "%d\n", tx_Mbps);
+		break;
+	default:
+		curr_len = snprintf(buf, PAGE_SIZE, "unknow\n");
+		break;
+}
+	return curr_len;
+}
+
+static ssize_t ufshcd_tx_Mbps_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	return count;
+}
+
+static void ufshcd_add_tx_Mbps_sysfs_nodes(struct ufs_hba *hba)
+{
+	hba->tx_Mbps_attr.show = ufshcd_tx_Mbps_show;
+	hba->tx_Mbps_attr.store = ufshcd_tx_Mbps_store;
+	sysfs_attr_init(&hba->tx_Mbps_attr.attr);
+	hba->tx_Mbps_attr.attr.name = "tx_Mbps";
+	hba->tx_Mbps_attr.attr.mode = S_IRUGO | S_IWUSR;
+	if (device_create_file(hba->dev, &hba->tx_Mbps_attr))
+		dev_err(hba->dev, "Failed to create sysfs for tx_Mbps_attr\n");
+}
+#endif
+
 static ssize_t ufshcd_ufs_productID_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -9584,6 +9672,10 @@ static inline void ufshcd_add_sysfs_nodes(struct ufs_hba *hba)
 	ufshcd_add_ufs_status_sysfs_nodes(hba);
 	ufshcd_add_ufs_productID_sysfs_nodes(hba);
 	ufshcd_add_ufs_fw_version_sysfs_nodes(hba);
+#if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT
+	ufshcd_add_rx_Mbps_sysfs_nodes(hba);
+	ufshcd_add_tx_Mbps_sysfs_nodes(hba);
+#endif
 }
 //ASUS_BSP Deeo : Get UFS info ---
 
@@ -9597,6 +9689,10 @@ static inline void ufshcd_remove_sysfs_nodes(struct ufs_hba *hba)
 	device_remove_file(hba->dev, &hba->ufs_status_attr);
 	device_remove_file(hba->dev, &hba->ufs_productID_attr);
 	device_remove_file(hba->dev, &hba->ufs_fw_version_attr);
+#if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT
+	device_remove_file(hba->dev, &hba->rx_Mbps_attr);
+	device_remove_file(hba->dev, &hba->tx_Mbps_attr);
+#endif
 }
 #endif
 

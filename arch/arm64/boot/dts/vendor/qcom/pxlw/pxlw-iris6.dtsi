@@ -121,7 +121,7 @@
 &dsi_ams678_er2_fhd_plus_dsc_cmd {
 	qcom,mdss-dsi-display-timings {
 		timing@0{
-			pxlw,iris-lightup-config = <&mdss_iris_cfg_ams678_fhd_plus_dsc_60hz_cmd>;
+			pxlw,iris-lightup-config = <&mdss_iris_cfg_ams678_fhd_plus_dsc_144hz_cmd>;
 		};
 
 		timing@1{
@@ -129,7 +129,7 @@
 		};
 
 		timing@2{
-			pxlw,iris-lightup-config = <&mdss_iris_cfg_ams678_fhd_plus_dsc_144hz_cmd>;
+			pxlw,iris-lightup-config = <&mdss_iris_cfg_ams678_fhd_plus_dsc_60hz_cmd>;
 		};
 
 		// FIXME

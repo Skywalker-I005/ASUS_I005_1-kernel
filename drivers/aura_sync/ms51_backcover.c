@@ -1541,6 +1541,115 @@ static ssize_t HWID_show(struct device *dev, struct device_attribute *attr,char 
 	return snprintf(buf, PAGE_SIZE,"%d%d\n", p15[0], p17[0]);
 }
 
+static ssize_t part_number_show(struct device *dev, struct device_attribute *attr,char *buf)
+{
+	struct i2c_client *client = to_i2c_client(dev->parent);
+	unsigned char data[15] = {0};
+	int err = 0;
+	unsigned char cmd[2] = {0};
+	struct i2c_msg msgs;
+
+	cmd[0] = 0xCB;
+	cmd[1] = 0x04;
+
+	mutex_lock(&g_pdata->ms51_mutex);
+	err = i2c_write_bytes(client, cmd, 2);
+	if (err !=1)
+		printk("[AURA_BACKCOVER] i2c_write_bytes 0xCB04 :err %d\n", err);
+
+	msleep(2);
+
+	//read data
+	msgs.flags = I2C_M_RD;		//read
+	msgs.addr = client->addr;
+	msgs.len = 15;
+	msgs.buf = data;
+	err = i2c_transfer(client->adapter,&msgs, 1);
+	mutex_unlock(&g_pdata->ms51_mutex);
+
+	printk("[AURA_BACKCOVER] MS51 90 part number = 0x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x\n",
+		data[0],data[1],data[2],data[3],data[4],data[5],data[6],data[7],data[8],data[9],data[10],data[11],data[12],data[13],data[14]);
+	return snprintf(buf, PAGE_SIZE,"0x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x\n",
+		data[0],data[1],data[2],data[3],data[4],data[5],data[6],data[7],data[8],data[9],data[10],data[11],data[12],data[13],data[14]);
+}
+
+static ssize_t IDs_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct i2c_client *client = to_i2c_client(dev->parent);
+	u32 val;
+	int err = 0;
+	ssize_t ret;
+	unsigned char cmd_buf[12] = {0};
+	
+	ret = kstrtou32(buf, 10, &val);
+	if (ret)
+		return count;
+
+	if (val == 1) {
+		mutex_lock(&g_pdata->ms51_mutex);
+
+		cmd_buf[0] = 0xCF;
+		cmd_buf[1] = 0xF1;
+		cmd_buf[2] = 0x02; //vendor id
+		cmd_buf[4] = 0x01; //game id
+		cmd_buf[6] = 0x03; //character id
+		cmd_buf[8] = 0x03; //light id
+		cmd_buf[10] = 0x06; //theme id
+
+		printk("[AURA_BACKCOVER] IDs_store: val = 1, write IDs info\n");
+		err = i2c_write_bytes(client, cmd_buf, 12);
+		if (err !=1)
+			printk("[AURA_BACKCOVER] IDs_store: i2c_write_bytes, err:%d\n", err);
+		mutex_unlock(&g_pdata->ms51_mutex);
+	} else if (val == 0) {
+		mutex_lock(&g_pdata->ms51_mutex);
+
+		memset(cmd_buf, 0xff, 12);		
+		cmd_buf[0] = 0xCF;
+		cmd_buf[1] = 0xF1;
+
+		printk("[AURA_BACKCOVER] IDs_store: val = 0, erase IDs info\n");
+		err = i2c_write_bytes(client, cmd_buf, 12);
+		if (err !=1)
+			printk("[AURA_BACKCOVER] IDs_store: i2c_write_bytes, err:%d\n", err);
+		mutex_unlock(&g_pdata->ms51_mutex);
+	}
+	
+	return count;
+}
+
+static ssize_t IDs_show(struct device *dev, struct device_attribute *attr,char *buf)
+{
+	struct i2c_client *client = to_i2c_client(dev->parent);
+	unsigned char data[10] = {0};
+	int err = 0;
+	unsigned char cmd[2] = {0};
+	struct i2c_msg msgs;
+
+	cmd[0] = 0xCB;
+	cmd[1] = 0x05;
+
+	mutex_lock(&g_pdata->ms51_mutex);
+	err = i2c_write_bytes(client, cmd, 2);
+	if (err !=1)
+		printk("[AURA_BACKCOVER] i2c_write_bytes 0xCB05 :err %d\n", err);
+
+	msleep(2);
+
+	//read data
+	msgs.flags = I2C_M_RD;		//read
+	msgs.addr = client->addr;
+	msgs.len = 10;
+	msgs.buf = data;
+	err = i2c_transfer(client->adapter,&msgs, 1);
+	mutex_unlock(&g_pdata->ms51_mutex);
+
+	printk("[AURA_BACKCOVER] MS51 IDs = 0x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x\n",
+		data[0],data[1],data[2],data[3],data[4],data[5],data[6],data[7],data[8],data[9]);
+	return snprintf(buf, PAGE_SIZE,"%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x\n",
+		data[0],data[1],data[2],data[3],data[4],data[5],data[6],data[7],data[8],data[9]);
+}
+
 static DEVICE_ATTR(red_pwm, 0664, red_pwm_show, red_pwm_store);
 static DEVICE_ATTR(green_pwm, 0664, green_pwm_show, green_pwm_store);
 static DEVICE_ATTR(blue_pwm, 0664, blue_pwm_show, blue_pwm_store);
@@ -1565,6 +1674,8 @@ static DEVICE_ATTR(VDD, 0664, ms51_vdd_show, ms51_vdd_store);
 static DEVICE_ATTR(led_color, 0664, led_color_show,led_color_store);
 static DEVICE_ATTR(mode2, 0664, mode2_show,mode2_store);
 static DEVICE_ATTR(HWID, 0664, HWID_show,NULL);
+static DEVICE_ATTR(part_number, 0664, part_number_show,NULL);
+static DEVICE_ATTR(IDs, 0664, IDs_show, IDs_store);
 
 static struct attribute *pwm_attrs[] = {
 	&dev_attr_red_pwm.attr,
@@ -1591,6 +1702,8 @@ static struct attribute *pwm_attrs[] = {
 	&dev_attr_led_color.attr,
 	&dev_attr_mode2.attr,
 	&dev_attr_HWID.attr,
+	&dev_attr_part_number.attr,
+	&dev_attr_IDs.attr,
 	NULL
 };
 
@@ -1810,6 +1923,11 @@ static int ms51_remove(struct i2c_client *client)
 	int err = 0;
 	struct ms51_platform_data *platform_data = i2c_get_clientdata(client);
 
+	if(g_Charger_mode) {
+		printk("[AURA_BACKCOVER] In charger mode, stop ms51_remove\n");
+		return 0;
+	}
+
 // unregister
 	printk("[AURA_BACKCOVER] sysfs_remove_group\n");
 	sysfs_remove_group(&platform_data->led.dev->kobj, &pwm_attr_group);
@@ -1920,3 +2038,5 @@ MODULE_AUTHOR("ASUS Lenter");
 MODULE_DESCRIPTION("Aura sync LEDs driver");
 MODULE_LICENSE("GPL v2");
 MODULE_ALIAS("asus:nuvoton-ms51");
+MODULE_IMPORT_NS(ANDROID_GKI_VFS_EXPORT_ONLY);
+MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);

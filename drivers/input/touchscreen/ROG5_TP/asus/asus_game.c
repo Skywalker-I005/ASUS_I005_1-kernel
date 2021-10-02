@@ -10,6 +10,18 @@ u8 slidling_sen = 0x0,sliding_acy = 0x0, touch_acy = 0x0;
 u8 Rcoefleft = 0x0A, RcoefRight=0x0A;
 int pre_angle = 0;
 bool wait_resume = false;
+
+int pre_report_rate = 1; //default 300Hz
+
+struct atr_queue *atr_buf_queue = NULL;
+
+static struct atr_queue* atr_buf_init(unsigned int _capacity);
+static ssize_t atr_queue_full(struct atr_queue *q);
+static ssize_t atr_queue_empty(struct atr_queue *q);
+
+static ssize_t atr_buf_write(struct atr_queue *q, u8 id, u8 active, u16 x, u16 y, u16 p, u16 m,ktime_t timestamp);
+static ssize_t atr_buf_read(struct atr_queue *q, struct input_dev *input_dev,ktime_t timestamp);
+
 /*****************************************************************************
 * 1.Static function prototypes
 *******************************************************************************/
@@ -220,44 +232,210 @@ void set_edge_palm() {
     wait_resume = false;
 }
 
-void rise_report_rate (bool rise) {
+void set_report_rate () {
     struct fts_ts_data *ts_data = fts_data;
     int ret = 0 , i = 0;
     u8 rate = 0;
-    if (rise) {
+    
+    if (fts_data->report_rate == REPORT_RATE_1) {
+	mutex_lock(&fts_data->reg_lock);      
+	for (i = 0; i < 6; i++) {
+	    ret = fts_write_reg(FTS_REG_REPORT_RATE, 0x00);
+	    msleep(20);
+	    ret = fts_read_reg(FTS_REG_REPORT_RATE, &rate);
+	    if (rate!=0x00){
+	      FTS_DEBUG("set report rate to 120Hz fail rate 0x%X , retry %d",rate, i);
+	      msleep(20);
+	    } else {
+      	      ts_data->report_rate = REPORT_RATE_1;
+	      FTS_DEBUG("set report rate to 120Hz rate %X",rate);
+	      break;
+	    }
+	}
+	mutex_unlock(&fts_data->reg_lock);
+    }
+    
+    if (fts_data->report_rate == REPORT_RATE_2) {
 	mutex_lock(&fts_data->reg_lock);      
 	for (i = 0; i < 6; i++) {
 	    ret = fts_write_reg(FTS_REG_REPORT_RATE, 0x1C);
 	    msleep(20);
 	    ret = fts_read_reg(FTS_REG_REPORT_RATE, &rate);
 	    if (rate!=0x1C){
-	      FTS_DEBUG("Rise report rate to 300Hz fail rate 0x%X , retry %d",rate, i);
+	      FTS_DEBUG("set report rate to 300Hz fail rate 0x%X , retry %d",rate, i);
 	      msleep(20);
 	    } else {
-      	      ts_data->report_rate = 300;
-	      FTS_DEBUG("Rise report rate to 300Hz rate %X",rate);
+      	      ts_data->report_rate = REPORT_RATE_2;
+	      FTS_DEBUG("set report rate to 300Hz rate %X",rate);
 	      break;
 	    }
 	}
 	mutex_unlock(&fts_data->reg_lock);
-    } else {
-        ret = fts_write_reg(FTS_REG_REPORT_RATE, 0x00);
-	msleep(10);
-	fts_read_reg(FTS_REG_REPORT_RATE, &rate);
-	if (rate != 0x1C){
-	  ts_data->report_rate = 120;
-          FTS_DEBUG("Decrease report rate to 120Hz");
+    } 
+
+    
+    if (fts_data->report_rate == REPORT_RATE_3) {
+	mutex_lock(&fts_data->reg_lock);      
+	for (i = 0; i < 6; i++) {
+	    ret = fts_write_reg(FTS_REG_REPORT_RATE_600, 0x01);
+	    msleep(20);
+	    ret = fts_read_reg(FTS_REG_REPORT_RATE_600, &rate);
+	    if (rate!=0x01){
+	      FTS_DEBUG("set report rate to 560Hz fail rate 0x%X , retry %d",rate, i);
+	      msleep(20);
+	    } else {
+      	      ts_data->report_rate = REPORT_RATE_3;
+	      FTS_DEBUG("set report rate to 560Hz rate %X",rate);
+	      break;
+	    }
 	}
-    }
-      
+	mutex_unlock(&fts_data->reg_lock);
+    }      
 }
+
+//Airtrigger & keymapping
+static ssize_t atr_queue_empty(struct atr_queue *q){
+	if (q == NULL){
+		return -1;
+	}else if(q->buf_size == 0) {
+		return 1;
+	}else {
+		return 0;
+	}
+}
+
+static ssize_t atr_queue_full(struct atr_queue *q){
+	if (q == NULL){
+		return -1;
+	}else if(q->buf_size == q->capacity){
+		return 1;
+	}else{
+		return 0;
+	}
+}
+
+static ssize_t atr_buf_write(struct atr_queue *q, u8 id, u8 active, u16 x, u16 y, u16 p, u16 m,ktime_t timestamp)
+{
+	if (q == NULL){
+		return -1;
+	} else if (atr_queue_full(q) == 1) {
+		FTS_INFO("[ATR] buf status = full");
+		return 0;
+	} else {
+		spin_lock(&q->buffer_lock);
+		q->tail = (q->tail + 1) % q->capacity;
+		q->data[q->tail].id = id;
+		q->data[q->tail].active = active;
+		q->data[q->tail].x = x;
+		q->data[q->tail].y = y;
+		q->data[q->tail].p = p;
+		q->data[q->tail].m = m;
+		q->data[q->tail].atr_time = timestamp;
+		q->buf_size++;
+		spin_unlock(&q->buffer_lock);
+		FTS_INFO("[ATR_Q_W] ID %d active %d x %d y %d p %d m %d t %llu", q->data[q->tail].id, q->data[q->tail].active, q->data[q->tail].x, q->data[q->tail].y,  q->data[q->tail].p,  q->data[q->tail].m,q->data[q->tail].atr_time);
+		return 1;
+	}
+}
+
+static ssize_t atr_buf_read(struct atr_queue *q, struct input_dev *input_dev,ktime_t timestamp)
+{
+	int id_buf[TOTAL_GAME_USED_SLOT];
+	int i = 0;
+	
+	memset(id_buf,-1,TOTAL_GAME_USED_SLOT);
+	
+	if (q == NULL){
+		return -1;
+	} else if (atr_queue_empty(q) == 1) {
+		return 0;
+	} else {
+		do {
+			struct atr_data* item = &(q->data[q->head]);
+			// check ID status
+			for(i = 0; i < TOTAL_GAME_USED_SLOT; i++) {
+				if (id_buf[i] == -1) {
+					break;
+				}
+				if (item->id == id_buf[i]) {
+					return 0;
+				}
+			}
+			spin_lock(&q->buffer_lock);
+			q->head = (q->head + 1) % q->capacity;
+			q->buf_size--;
+			spin_unlock(&q->buffer_lock);
+			FTS_INFO("[ATR_Q_R] ID %d active %d x %d y %d p %d m %d time %llu", item->id, item->active, item->x, item->y, item->p, item->m,timestamp);
+			
+			input_mt_slot(input_dev, item->id);
+			if (item->active == true) {
+				input_mt_report_slot_state(input_dev, MT_TOOL_FINGER, true);
+				input_set_timestamp(input_dev,timestamp);
+				input_report_abs(input_dev, ABS_MT_PRESSURE, item->p);
+				input_report_abs(input_dev, ABS_MT_TOUCH_MAJOR, item->m);
+				input_report_abs(input_dev, ABS_MT_POSITION_X, item->x);
+				input_report_abs(input_dev, ABS_MT_POSITION_Y, item->y);
+			} else {
+				input_mt_report_slot_state(input_dev, MT_TOOL_FINGER, false);
+			}
+			// save ID 
+			for(i = 0; i < TOTAL_GAME_USED_SLOT; i++) {
+				if (id_buf[i] == -1) {
+					id_buf[i] = item->id;
+					break;
+				}
+			}
+		} while (atr_queue_empty(q) != 1);
+		return 0;
+	}
+}
+
+static struct atr_queue* atr_buf_init(unsigned int _capacity)
+{
+	struct atr_queue *ATRQueue = (struct atr_queue *)kmalloc(sizeof(struct atr_queue), GFP_KERNEL);
+
+	if (ATRQueue == NULL ){
+		FTS_INFO("Malloc failed");
+		return NULL;
+	} else {
+		ATRQueue->tail = -1;
+		ATRQueue->head = 0;
+		ATRQueue->buf_size = 0;
+		ATRQueue->capacity = _capacity;
+		ATRQueue->data = (struct atr_data *)kmalloc(_capacity * sizeof(struct atr_data), GFP_KERNEL);
+		if (ATRQueue->data == NULL) {
+			FTS_INFO("Malloc failed");
+			kfree(ATRQueue);
+			return NULL;
+		} else {
+			spin_lock_init(&ATRQueue->buffer_lock);
+			return ATRQueue;
+		}
+	}
+}
+
+int is_atr_empty(void) {
+  if (atr_queue_empty(atr_buf_queue) != 1) 
+    return 1;
+  else
+    return 0;
+}
+
+void report_atr(ktime_t timestamp) {
+     struct input_dev *input_dev = fts_data->input_dev;
+     
+     atr_buf_read(atr_buf_queue, input_dev,timestamp);
+}
+
 void ATR_touch(int id,int action, int x, int y, int random)
 {
-	static int random_x = -5, random_y = -5, random_major = -5;
+	static int random_x = -5, random_y = -5, random_major = -5, random_pressure = -20;
 	struct input_dev *input_dev = fts_data->input_dev;
 	int first_empty_slot = -1;
 	int i;
 
+	static bool first_continue_flag = false;
+	
 	FTS_INFO("keymapping ATR_touch  id=%d, action=%d, x=%d, y=%d", id, action,  x,  y);
 	mutex_lock(&input_dev->mutex);
 	if(action) //press, find first slot or find last slot;
@@ -283,22 +461,34 @@ void ATR_touch(int id,int action, int x, int y, int random)
 			}
 			input_report_abs(input_dev, ABS_MT_TOUCH_MAJOR, 0x09 + random_major);
 
-			if(!random)
-			{
-				input_report_abs(input_dev, ABS_MT_POSITION_X, x + random_x);
-				input_report_abs(input_dev, ABS_MT_POSITION_Y, y + random_y);
-			} else {
+			if(!random) {
+				x += random_x;
+				y += random_y;
+			}
+			if(!fts_data->finger_press) {
+				input_mt_slot(input_dev, first_empty_slot + 10);
+				input_mt_report_slot_state(input_dev, MT_TOOL_FINGER, true);
+				input_report_abs(input_dev, ABS_MT_PRESSURE, 0x3f + random_pressure);
+				input_report_abs(input_dev, ABS_MT_TOUCH_MAJOR, 0x09 + random_major);
 				input_report_abs(input_dev, ABS_MT_POSITION_X, x );
 				input_report_abs(input_dev, ABS_MT_POSITION_Y, y );
+				FTS_INFO("[ATR_N_R] ID %d active %d x %d y %d p %d m %d", first_empty_slot + 10, action, x, y, 0x3f + random_pressure, 0x09 + random_major);
+			} else {
+				atr_buf_write(atr_buf_queue, first_empty_slot + 10, action, x, y, 0x3f + random_pressure, 0x09 + random_major,fts_data->atr_received);
 			}
 
-			if(!fts_data->finger_press){
+			if(!fts_data->finger_press) {
+			    if(first_continue_flag == false) {
 				FTS_INFO("no touch BTN down , atr touch down");
 				input_report_key(input_dev, BTN_TOUCH, 1);
+				if (random == 1)
+				    first_continue_flag = true;
+			    }
 			} else {
 				FTS_INFO("touch BTN down long pressed , ignore atr touch down");
 			}
-			input_sync(input_dev);
+			if(!fts_data->finger_press)
+			    input_sync(input_dev);
 
 			touch_figer_slot[first_empty_slot] = id + 1; // save finger id in slot 			
 			fts_data->atr_press = true;
@@ -319,9 +509,14 @@ void ATR_touch(int id,int action, int x, int y, int random)
 		FTS_INFO("keymapping  release slot %d", first_empty_slot);
 		if(first_empty_slot >= 0)
 		{
-			input_mt_slot(input_dev, first_empty_slot + 10);
-			input_mt_report_slot_state(input_dev, MT_TOOL_FINGER, false);
-			input_sync(input_dev);
+			if(!fts_data->finger_press) {
+				input_mt_slot(input_dev, first_empty_slot + 10);
+				input_mt_report_slot_state(input_dev, MT_TOOL_FINGER, false);
+				FTS_INFO("[ATR_N_R] ID %d active %d x %d y %d p %d m %d", first_empty_slot + 10, action, 0, 0, 0, 0);
+				input_sync(input_dev);
+			} else {
+				atr_buf_write(atr_buf_queue, first_empty_slot + 10, action, 0, 0, 0, 0,fts_data->atr_received);
+			}
 			touch_figer_slot[first_empty_slot] = 0;
 		}
 	}
@@ -334,6 +529,9 @@ void ATR_touch(int id,int action, int x, int y, int random)
 	if(i < 0) // all button up
 	{
 		fts_data->atr_press = false;
+		if(first_continue_flag == true) {
+			first_continue_flag = false;
+		}
 		if(!fts_data->finger_press)
 		{
 		    FTS_INFO("no touch and atr BTN down, all BTN up");
@@ -345,7 +543,7 @@ void ATR_touch(int id,int action, int x, int y, int random)
 	random_x += 1; if(random_x > 5) random_x = -5;
 	random_y += 1; if(random_y > 5) random_y = -5;
 	random_major += 1; if(random_major > 5) random_major = -5;
-
+        random_pressure += 1; if(random_pressure > 20) random_pressure = -20;
 	mutex_unlock(&input_dev->mutex);
 }
 
@@ -600,11 +798,26 @@ static ssize_t rise_report_rate_show (struct device *dev, struct device_attribut
 static ssize_t rise_report_rate_store(
     struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
 {  
-    if (FTS_SYSFS_ECHO_ON(buf)) {
-        rise_report_rate(true);
-    } else if (FTS_SYSFS_ECHO_OFF(buf)) {
-	rise_report_rate(false);
-    }
+        bool reconfig = false;
+	if (buf[0] == '0') {
+	  if (pre_report_rate != 0)
+	      reconfig = true;	  
+	  fts_data->report_rate = REPORT_RATE_1; //120Hz
+	  pre_report_rate = 0;
+	} else if (buf[0] == '1') {
+  	  if (pre_report_rate != 1)
+	      reconfig = true;	  
+	  fts_data->report_rate = REPORT_RATE_2; //300Hz
+	  pre_report_rate =1;
+	} else if (buf[0] == '2') {
+	  if (pre_report_rate != 2)
+	      reconfig = true;	  
+	  fts_data->report_rate = REPORT_RATE_3;//560Hz
+	  pre_report_rate = 2;
+	}
+  
+    if (reconfig)  
+        set_report_rate();
 
     FTS_DEBUG("Report rate set to:%d", fts_data->report_rate);
     return count;
@@ -687,7 +900,20 @@ void asus_game_recovery(struct fts_ts_data *ts_data)
     if (wait_resume) {
 	FTS_INFO("Game mode setting recovery");
 	set_edge_palm();
-    }  
+    }
+}
+
+void report_rate_recovery(struct fts_ts_data *ts_data) 
+{
+    FTS_INFO("reconfig with report rate %d",fts_data->report_rate);
+    if (fts_data->report_rate ==REPORT_RATE_1) 
+        set_report_rate();
+    if (fts_data->report_rate ==REPORT_RATE_3) {
+        fts_data->report_rate = REPORT_RATE_2;
+        set_report_rate();
+	fts_data->report_rate = REPORT_RATE_3;
+	set_report_rate();
+    }
 }
 
 int asus_game_create_sysfs(struct fts_ts_data *ts_data)
@@ -705,8 +931,11 @@ int asus_game_create_sysfs(struct fts_ts_data *ts_data)
     
     ts_data->game_mode = DISABLE;
     ts_data->rotation_angle = 0;
-    ts_data->report_rate = 300;
+    ts_data->report_rate = REPORT_RATE_2;
     fts_data->edge_palm_enable = 2;
+    
+    atr_buf_queue = atr_buf_init(ATR_QUEUE_SIZE);
+    
     mutex_init(&ts_data->reg_lock);
     return ret;
 }

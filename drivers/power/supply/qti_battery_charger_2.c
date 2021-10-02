@@ -60,6 +60,8 @@ extern bool g_once_usb_thermal_btm;
 extern bool g_once_usb_thermal_side;
 extern void qti_charge_notify_device_charge(void);
 extern void qti_charge_notify_device_not_charge(void);
+extern void get_cc_status_from_ADSP(void);
+extern bool side_port_cc_status;
 
 //Move to battery_charger.h
 #if 0
@@ -907,10 +909,13 @@ static int usb_psy_get_prop(struct power_supply *psy,
 	if (prop == POWER_SUPPLY_PROP_TEMP)
 		pval->intval = pval->intval - 2731; // ASUS_BSP: change 0.1K to 0.1C
 		// pval->intval = DIV_ROUND_CLOSEST((int)pval->intval, 10);
-	if (prop == POWER_SUPPLY_PROP_ONLINE) {	// ASUS BSP: set online = 1 when feature usbin_suspend with cable
-		if (g_vbus_plug && (feature_stop_chg_flag | bFactoryChgLimit | smartchg_stop_flag
-			| g_once_usb_thermal_btm | g_once_usb_thermal_side))
+	if (prop == POWER_SUPPLY_PROP_ONLINE && pval->intval == 0) {	// ASUS BSP: set online = 1 when feature usbin_suspend with cable
+		get_cc_status_from_ADSP();
+		if (side_port_cc_status) {
 			pval->intval = 1;
+		} else if (g_vbus_plug && (feature_stop_chg_flag | g_once_usb_thermal_btm | g_once_usb_thermal_side)) {
+			pval->intval = 1;
+		}
 	}
 
 	return 0;
@@ -1050,7 +1055,8 @@ static int battery_psy_get_prop(struct power_supply *psy,
 	struct battery_chg_dev *bcdev = power_supply_get_drvdata(psy);
 	struct psy_state *pst = &bcdev->psy_list[PSY_TYPE_BATTERY];
 	int prop_id, rc;
-	static u32 prop_cache[25] = {0};
+	static int prop_cache[32] = {0};
+	static char model_name[32] = {0};
 
 	pval->intval = -ENODATA;
 
@@ -1061,10 +1067,16 @@ static int battery_psy_get_prop(struct power_supply *psy,
 	rc = read_property_id(bcdev, pst, prop_id);
 	if (rc < 0)
 	{
-		if (prop_cache[prop_id] != 0)
+		if (prop_cache[prop_id] != 0 && prop_id != 18)
 		{
 			pval->intval = prop_cache[prop_id];
-			pr_err("battery_psy_get_prop error: Use cache prop_cache[prop_id]: %d, prop_id: %d\n", prop_cache[prop_id],prop_id);
+			pr_err("battery_psy_get_prop error: Use cache prop_cache[prop_id]: %d, prop_id: %d\n", prop_cache[prop_id], prop_id);
+		}
+
+		if (prop_id == 18)
+		{
+			pval->strval = model_name;
+			pr_err("battery_psy_get_prop error: Use cache pval->strval]: %s, prop_id: %d\n", pval->strval, prop_id);
 		}
 		return 0;
 	}
@@ -1072,6 +1084,7 @@ static int battery_psy_get_prop(struct power_supply *psy,
 	switch (prop) {
 	case POWER_SUPPLY_PROP_MODEL_NAME:
 		pval->strval = pst->model;
+		strcpy(model_name, pst->model);
 		break;
 	case POWER_SUPPLY_PROP_CAPACITY:
 		pval->intval = DIV_ROUND_CLOSEST(pst->prop[prop_id], 100);
@@ -1107,6 +1120,26 @@ static int battery_psy_get_prop(struct power_supply *psy,
 		break;
 	}
 	prop_cache[prop_id] = pval->intval;
+	if(g_ASUS_hwID > HW_REV_ER && strcmp(model_name, "default") == 0)
+	{
+		switch (prop) {
+		case POWER_SUPPLY_PROP_CAPACITY:
+			pval->intval = 81;
+			break;
+		case POWER_SUPPLY_PROP_TEMP:
+			pval->intval = 250;
+			break;
+		case POWER_SUPPLY_PROP_VOLTAGE_NOW:
+			pval->intval = 8000000;
+			break;
+		case POWER_SUPPLY_PROP_CURRENT_NOW:
+			pval->intval = 200000;
+			break;
+		default:
+			break;
+		}
+
+	}
 
 	return rc;
 }

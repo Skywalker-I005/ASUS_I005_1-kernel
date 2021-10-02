@@ -223,6 +223,8 @@ struct fts_ts_data {
     int auth_complete;
     int display_state;
     int fp_mini;
+    bool fp_filter;
+    bool wait_reset;
 //gesture
     int gesture_mode_enable;
     int music_control;

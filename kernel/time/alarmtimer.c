@@ -338,6 +338,11 @@ static int alarmtimer_suspend(struct device *dev)
 #endif
 	if (ktime_to_ns(min) < 2 * NSEC_PER_SEC) {
 		__pm_wakeup_event(ws, 2 * MSEC_PER_SEC);
+#if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT
+    //[PM_debug+++]        
+        dev_err(dev, "Nearest alarm wakeup time < 2sec, avoiding suspend\n");
+    //[PM_debug---]
+#endif        
 		return -EBUSY;
 	}
 

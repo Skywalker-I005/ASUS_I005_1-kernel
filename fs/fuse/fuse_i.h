@@ -253,6 +253,12 @@ struct fuse_args {
 	struct fuse_in_arg in_args[3];
 	struct fuse_arg out_args[2];
 	void (*end)(struct fuse_conn *fc, struct fuse_args *args, int error);
+
+#if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT
+	/* Path used for completing d_canonical_path */
+	struct path *canonical_path;
+#endif
+
 };
 
 struct fuse_args_pages {

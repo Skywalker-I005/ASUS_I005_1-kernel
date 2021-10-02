@@ -33,6 +33,10 @@ static bool g_Charger_mode=false;
 
 static int VDD_count;
 
+static int LGF_ID = 0;
+static int LGF_gpio = -1;
+static u32 LGF_gpio_flag = 0;
+
 int mode2_state=0;
 int apply_state=0;
 static struct ms51_platform_data *g_pdata;
@@ -1722,6 +1726,8 @@ static int ms51_parse_dt(struct device *dev, struct ms51_platform_data *pdata)
 	printk("[AURA_MS51] logo_5p0_en : %d\n", pdata->logo_5p0_en);
 	pdata->front_led_en = of_get_named_gpio_flags(np, "nuvoton,front_led_en", 0, &pdata->front_led_en_flags);
 	printk("[AURA_MS51] front_led_en : %d\n", pdata->front_led_en);
+	LGF_gpio = of_get_named_gpio_flags(np, "nuvoton,lgf_id", 0, &LGF_gpio_flag);
+	printk("[AURA_MS51] LGF_gpio : %d\n", LGF_gpio);
 
 	retval = of_property_read_u32(np, "nuvoton,hw_stage", &pdata->hw_stage);
 	if (retval < 0) {
@@ -1757,6 +1763,28 @@ static int ms51_parse_dt(struct device *dev, struct ms51_platform_data *pdata)
 		printk("[AURA_MS51] regulator_current : %d\n", pdata->regulator_current);
 	}
 
+	if ( gpio_is_valid(LGF_gpio) ){
+		printk("[AURA_MS51] Get the pinctrl node \n");
+		// Get the pinctrl node
+		pdata->pinctrl = devm_pinctrl_get(dev);
+		if (IS_ERR_OR_NULL(pdata->pinctrl)) {
+		     dev_err(dev, "%s: Failed to get pinctrl\n", __func__);
+		}
+
+		printk("[AURA_MS51] Get the active setting \n");
+		// Get the active setting
+		pdata->lgf_gpio_active = pinctrl_lookup_state(pdata->pinctrl, "active");
+		if (IS_ERR_OR_NULL(pdata->lgf_gpio_active)) {
+			dev_err(dev, "%s: Failed to get pinctrl active state\n", __func__);
+		}
+
+		printk("[AURA_MS51] Get the release setting \n");
+		// Get the active setting
+		pdata->lgf_gpio_release = pinctrl_lookup_state(pdata->pinctrl, "release");
+		if (IS_ERR_OR_NULL(pdata->lgf_gpio_release)) {
+			dev_err(dev, "%s: Failed to get pinctrl relase state\n", __func__);
+		}
+	}
 	return 0;
 }
 
@@ -1784,6 +1812,32 @@ static int ms51_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	err = ms51_parse_dt(&client->dev, platform_data);
 	if (err) {
 		printk("[AURA_MS51] ms51_parse_dt get fail !!!\n");
+		goto parse_remove;
+	}
+
+// Read LGF ID
+	if ( gpio_is_valid(LGF_gpio) ){
+		// Set the active setting
+		printk("[AURA_MS51] set the LGF gpio active state\n");
+		err = pinctrl_select_state(platform_data->pinctrl, platform_data->lgf_gpio_active);
+		if (err)
+			printk("[AURA_MS51] pinctrl_select_state err:%d\n", err);
+
+		msleep(10);
+		LGF_ID = gpio_get_value(LGF_gpio);
+		printk("[AURA_MS51] LGF_ID is %d\n", LGF_ID);
+
+		// Set the release setting
+		printk("[AURA_MS51] set the LGF gpio relase state\n");
+		err = pinctrl_select_state(platform_data->pinctrl, platform_data->lgf_gpio_release);
+		if (err)
+			printk("[AURA_MS51] pinctrl_select_state err:%d\n", err);
+
+	}else
+		printk("[AURA_MS51] LGF_gpio %d is invalid\n", LGF_gpio);
+
+	if (LGF_ID){
+		printk("[AURA_MS51] Device is High End, disable this module.\n");
 		goto parse_remove;
 	}
 

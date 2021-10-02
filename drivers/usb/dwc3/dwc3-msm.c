@@ -5086,6 +5086,16 @@ static int dwc3_msm_host_notifier(struct notifier_block *nb,
 	if (event != USB_DEVICE_ADD && event != USB_DEVICE_REMOVE)
 		return NOTIFY_DONE;
 
+#if defined ASUS_ZS673KS_PROJECT
+	if (udev->parent){ //workaround for WD 25F3 HDD
+		if (event == USB_DEVICE_ADD && !strcmp(dev_name(udev->bus->controller->parent), "a800000.dwc3")
+			&& le16_to_cpu(udev->parent->descriptor.idVendor)==0x1d6b && le16_to_cpu(udev->parent->descriptor.idProduct)==0x0002
+			&& le16_to_cpu(udev->descriptor.idVendor)==0x1058 && le16_to_cpu(udev->descriptor.idProduct)==0x25f3){
+			dev_info(mdwc->dev, "[USB] %s: usb2 connect WD 25F3 HDD, redriver close for workaround\n", __func__);
+			redriver_reset_n(1);
+		}
+	}
+#endif
 	/*
 	 * For direct-attach devices, new udev is direct child of root hub
 	 * i.e. dwc -> xhci -> root_hub -> udev

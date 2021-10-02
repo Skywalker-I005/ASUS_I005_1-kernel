@@ -708,13 +708,30 @@ static void grip_sense2_setting(bool flag){
 }
 /* ASUS BSP Clay: ---*/
 
+static void grip_set_game_gesture_sysp(bool flag){
+	const char *buf_on = "110 14\n";
+	const char *buf_off = "110 0\n";
+	static bool status = false;
+	if(status != flag){
+		if(grip_game_gesture_status() == 0 && flag == false){
+			msleep(50);
+			grip_set_sys_param(buf_off);
+			status = flag;
+		}else if(grip_game_gesture_status() == 1 && flag == true){
+			msleep(50);
+			grip_set_sys_param(buf_on);
+			status = flag;
+		}
+	}
+}
+
 static void grip_slide_swipe_status_check(void){
 	uint16_t enable_sensitive_boost = 0x84;
 	uint16_t disable_sensitive_boost = 0x4;
 	uint16_t boost_addr = 0x3d;
 	static int swipe_status = 0, gesture_status = 0, slide_status = 0;
-	const char *swipe_buf_on = "110 1\n";
-	const char *slide_buf_on = "110 5\n";
+	const char *swipe_buf_on = "110 14\n";
+	const char *slide_buf_on = "110 14\n";
 	const char *buf_off = "110 0\n";
 	
 	if(grip_status_g->G_SLIDE_EN[0] == 1 || grip_status_g->G_SLIDE_EN[1] == 1
@@ -766,7 +783,9 @@ static void grip_slide_swipe_status_check(void){
 			slide_status = 0;
 			write_register(snt8100fsr_g, boost_addr, &disable_sensitive_boost);
 			msleep(50);
-			grip_set_sys_param(buf_off);
+			if(grip_game_gesture_status() == 0){
+				grip_set_sys_param(buf_off);
+			}
 			grip_sense2_setting(false);
 		}
 	}
@@ -1004,6 +1023,11 @@ void grip_tap_enable_func(int tap_id, int val, uint16_t* reg ) {
 
 		//get_tap_gesture(0, *reg, 0, tap_id*8 +9);
 		grip_check_DPC_and_sensitivity_func();
+		if(val == 1){
+			grip_set_game_gesture_sysp(true);
+		}else{
+			grip_set_game_gesture_sysp(false);
+		}
 
 		if( val==0) { //turn off, check if (all off) goto low power
 			grip_checkToLowPower_noLock();
@@ -1361,6 +1385,10 @@ void grip_squeeze_enable_func(int sq_id, int val, uint16_t* reg){
 		* reg = (val & 0x8000) | (* reg & 0x7FFF);
 		set_sq_gesture(sq_id, * reg, 0);
 		//get_sq_gesture(0, * reg, 0, 2);
+
+		if(val == 1){
+			grip_set_game_gesture_sysp(false);
+		}
 
 		if( val==0) { //turn off, check if (all off) goto low power
 			grip_checkToLowPower_noLock();
@@ -1810,7 +1838,6 @@ void grip_swipe_enable_func(int swipe_id, int val, uint16_t* reg){
 		val = val << 15;
 		* reg = (val & 0x8000) | (* reg & 0x7FFF);
 		set_swipe_gesture(swipe_id, *reg, 0);
-		 PRINT_INFO("Write Swipe1_En: 0x%x", *reg);
 		grip_check_DPC_and_sensitivity_func();
 		grip_slide_swipe_status_check();
 

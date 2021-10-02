@@ -492,7 +492,7 @@ static int chg_tcp_notifer_call(struct notifier_block *nb,
 			pr_info("%s tcpc_pd_state = PD_CONNECT_PE_READY_SNK/PD3.0, USB_COMM = %d\n", __func__, info->peer_usb_comm);
 			rt1715_pdo_notify();
 			rt1715_vid_notify();
-			if (info->peer_usb_comm)
+			if (info->peer_usb_comm && tcpc_pre_typec_state == TYPEC_UNATTACHED)
 				rt1715_dwc3_msm_usb_set_role(USB_ROLE_DEVICE);
 			break;
 		case PD_CONNECT_PE_READY_SRC:
@@ -502,6 +502,7 @@ static int chg_tcp_notifer_call(struct notifier_block *nb,
 			dpm_flags = tcpm_inquire_dpm_flags(tcpc);
 			info->peer_usb_comm = (dpm_flags &= DPM_FLAGS_PARTNER_USB_COMM);
 			pr_info("%s tcpc_pd_state = PD_CONNECT_PE_READY_SRC, VID = %x, ret = %d, USB_COMM = %d\n",__func__, vid, ret, info->peer_usb_comm);
+			rt1715_pdo_notify();
 			if (vid == 0x0b05){
 				gamepad_active = 1;
 				pr_info("%s gamepad_active = %d\n", __func__, gamepad_active);

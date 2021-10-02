@@ -540,7 +540,7 @@ int asus_create_sysfs(struct fts_ts_data *ts_data)
     fts_data->auth_complete = 1;
     ts_data->phone_call_state = false;
     ts_data->perftime = DISABLE;
-    ts_data->realtime = ENABLE;
+    ts_data->realtime = DISABLE;
     
 #if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT
     ts_data->charge_notify.notifier_call = charge_notifier_callback;

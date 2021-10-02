@@ -24,6 +24,10 @@
 
 #define unk	KEY_UNKNOWN
 
+#if defined ASUS_ZS673KS_PROJECT
+extern bool g_screen_on;
+#endif
+
 static const unsigned char hid_keyboard[256] = {
 	  0,  0,  0,  0, 30, 48, 46, 32, 18, 33, 34, 35, 23, 36, 37, 38,
 	 50, 49, 24, 25, 16, 19, 31, 20, 22, 47, 17, 45, 21, 44,  2,  3,
@@ -1293,6 +1297,13 @@ void hidinput_hid_event(struct hid_device *hid, struct hid_field *field, struct 
 
 	if (!field->hidinput)
 		return;
+
+#if defined ASUS_ZS673KS_PROJECT
+	if ((usage->code == ASUS_STATION_L1 || usage->code == ASUS_STATION_R1) && !g_screen_on) {
+		printk("hidinput_hid_event: don't send inbox key event when screen off\n");
+		return;
+	}
+#endif
 
 	input = field->hidinput->input;
 

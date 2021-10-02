@@ -1492,7 +1492,7 @@
 			bst-bpe-il-lim-thld-hyst = <0x0>;
 			bst-bpe-il-lim-thld-del2 = <0x0>;
 			bst-bpe-il-lim-thld-del1 = <0x0>;
-			bst-bpe-il-lim1-thld = <0x31>;
+			bst-bpe-il-lim1-thld = <0x2c>;
 		};
 		cirrus,ldpm-config {
 			ldpm-gp1-boost-sel = <0x1>;
@@ -1532,7 +1532,7 @@
 			bst-bpe-il-lim-thld-hyst = <0x0>;
 			bst-bpe-il-lim-thld-del2 = <0x0>;
 			bst-bpe-il-lim-thld-del1 = <0x0>;
-			bst-bpe-il-lim1-thld = <0x31>;
+			bst-bpe-il-lim1-thld = <0x2c>;
 		};
 		cirrus,ldpm-config {
 			ldpm-gp1-boost-sel = <0x1>;

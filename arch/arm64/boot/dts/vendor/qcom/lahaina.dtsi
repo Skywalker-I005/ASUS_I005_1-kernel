@@ -402,32 +402,32 @@
 
 	hyp_reserved_mem: qheebsp_dbg_vm_hyp_region@d0000000 {
 		no-map;
-		reg = <0x0 0xd0000000 0x0 0x800000>;
+		//reg = <0x0 0xd0000000 0x0 0x800000>;
 	};
 
 	pil_trustedvm_mem: pil_trustedvm_region@d0800000 {
 		no-map;
-		reg = <0x0 0xd0800000 0x0 0x76f7000>;
+		//reg = <0x0 0xd0800000 0x0 0x76f7000>;
 	};
 
 	qrtr_shbuf: qrtr-shmem {
 		no-map;
-		reg = <0x0 0xd7ef7000 0x0 0x9000>;
+		//reg = <0x0 0xd7ef7000 0x0 0x9000>;
 	};
 
 	chan0_shbuf: neuron_block@0 {
 		no-map;
-		reg = <0x0 0xd7f00000 0x0 0x80000>;
+		//reg = <0x0 0xd7f00000 0x0 0x80000>;
 	};
 
 	chan1_shbuf: neuron_block@1 {
 		no-map;
-		reg = <0x0 0xd7f80000 0x0 0x80000>;
+		//reg = <0x0 0xd7f80000 0x0 0x80000>;
 	};
 
 	removed_mem: removed_region@d8800000 {
 		no-map;
-		reg = <0x0 0xd8800000 0x0 0x6800000>;
+		reg = <0x0 0xd8800000 0x0 0xA800000>;
 	};
 
 	adsp_mem: adsp_region {
@@ -528,12 +528,12 @@
 	};
 
 	splash_memory:splash_region {
-		reg = <0x0 0xe1000000 0x0 0x02300000>;
+		reg = <0x0 0xe5000000 0x0 0x02300000>;
 		label = "cont_splash_region";
 	};
 
 	dfps_data_memory: dfps_data_region {
-		reg = <0x0 0xe3300000 0x0 0x0100000>;
+		reg = <0x0 0xe7400000 0x0 0x0100000>;
 		label = "dfps_data_region";
 	};
 
@@ -2162,7 +2162,7 @@
 			class = "message-queue";
 			direction = "receive";
 			max-size = <0 65536>;
-			shared-buffer = <&chan0_shbuf>;
+			//shared-buffer = <&chan0_shbuf>;
 			qcom,primary;
 			haven-label = <1>;
 			peer-name = <2>;
@@ -2174,7 +2174,7 @@
 			class = "message-queue";
 			direction = "send";
 			max-size = <0 65536>;
-			shared-buffer = <&chan1_shbuf>;
+			//shared-buffer = <&chan1_shbuf>;
 			qcom,primary;
 			haven-label = <2>;
 			peer-name = <2>;
@@ -2199,7 +2199,7 @@
 		qcom,master;
 		haven-label = <3>;
 		peer-name = <2>;
-		shared-buffer = <&qrtr_shbuf>;
+		//shared-buffer = <&qrtr_shbuf>;
 	};
 
 	jtag_mm0: jtagmm@7040000 {
@@ -5189,7 +5189,7 @@
 		status = "ok";
 		qcom,pas-id = <28>;
 		qcom,firmware-name = "trustedvm";
-		memory-region = <&pil_trustedvm_mem>;
+		//memory-region = <&pil_trustedvm_mem>;
 	};
 
 	qcom,guestvm_loader {
@@ -5375,7 +5375,7 @@
 		cnss-enable-self-recovery;
 
 		vdd-wlan-aon-supply = <&S2E>;
-		qcom,vdd-wlan-aon-config = <950000 952000 0 0 1>;
+		qcom,vdd-wlan-aon-config = <976000 976000 0 0 1>;
 		vdd-wlan-dig-supply = <&S11B>;
 		qcom,vdd-wlan-dig-config = <950000 952000 0 0 1>;
 		vdd-wlan-io-supply = <&S10B>;

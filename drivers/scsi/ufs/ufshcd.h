@@ -786,6 +786,8 @@ struct ufs_hba {
 	struct device_attribute ufs_status_attr;
 	struct device_attribute ufs_productID_attr;
 	struct device_attribute ufs_fw_version_attr;
+	struct device_attribute rx_Mbps_attr;
+	struct device_attribute tx_Mbps_attr;
 	u64 ufs_size;
 	char ufs_total_size[10];
 	char ufs_status[32];

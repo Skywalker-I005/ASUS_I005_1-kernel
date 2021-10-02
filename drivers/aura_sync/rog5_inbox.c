@@ -1007,7 +1007,7 @@ static ssize_t set_frame(struct device *dev, struct device_attribute *attr, cons
 	}
 	
 	data[0] = 0x80;
-	data[1] = 0xF3;
+	data[1] = 0xF2;
 	data[2] = val;
 
 	err = asus_usb_hid_write_aprom(data, 3);
@@ -2351,6 +2351,9 @@ void disable_autosuspend_worker(struct work_struct *work)
 	usb_disable_autosuspend(interface_to_usbdev(to_usb_interface(rog5_inbox_hidraw->hid->dev.parent)));
 }
 
+#if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT
+extern void inbox_connect(void);
+#endif
 static int rog5_inbox_usb_probe(struct hid_device *hdev, const struct hid_device_id *id)
 {
 	int ret = 0;
@@ -2417,7 +2420,11 @@ static int rog5_inbox_usb_probe(struct hid_device *hdev, const struct hid_device
 
 	INIT_DELAYED_WORK(&disable_autosuspend_work, disable_autosuspend_worker);
 	schedule_delayed_work(&disable_autosuspend_work, msecs_to_jiffies(1000));
-	
+
+#if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT
+	inbox_connect();
+#endif
+
 	return 0;
 
 unregister:
@@ -2428,9 +2435,7 @@ err_free:
 	return ret;
 }
 
-#if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT
-extern void inbox_disconnect_notifier(void);
-#endif
+
 static void rog5_inbox_usb_remove(struct hid_device *hdev)
 {
 	struct inbox_drvdata *drvdata = dev_get_drvdata(&hdev->dev);;
@@ -2440,17 +2445,14 @@ static void rog5_inbox_usb_remove(struct hid_device *hdev)
 		return;
 	}
 
-#if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT
-	ASUSEvtlog("[ROG5_INBOX] rog5_inbox disconnect!!!\n");
+#if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT	
+	ASUSEvtlog("[ROG5_INBOX] rog5 inbox disconnect\n");
 #endif
 
 	sysfs_remove_group(&drvdata->led.dev->kobj, &pwm_attr_group);
 	aura_sync_unregister(drvdata);
 	rog5_inbox_hidraw = NULL;
 	hid_hw_stop(hdev);
-#if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT
-	inbox_disconnect_notifier();
-#endif
 }
 
 static struct hid_device_id rog5_inbox_idtable[] = {

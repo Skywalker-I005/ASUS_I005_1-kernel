@@ -18,6 +18,7 @@
 #include <linux/usb.h>
 #include <linux/time.h>
 #include <linux/iio/consumer.h>
+#include <linux/regulator/consumer.h>
 
 #include <dt-bindings/iio/qcom,spmi-vadc.h>
 #include <dt-bindings/iio/qcom,spmi-adc7-pm8350.h>
@@ -71,6 +72,9 @@ EXPORT_SYMBOL(ec_porta_cc);
 struct ec_fw_ver_interface ec_fw_ver;
 EXPORT_SYMBOL(ec_fw_ver);
 
+bool g_screen_on;
+EXPORT_SYMBOL(g_screen_on);
+
 extern void usb_enable_autosuspend(struct usb_device *);
 extern void usb_disable_autosuspend(struct usb_device *);
 
@@ -86,6 +90,9 @@ extern bool g_skip_ss_lanes;
 static struct drm_panel *active_panel;
 struct notifier_block display_notifier;
 struct delayed_work	ec_hid_set_drm_work;
+struct regulator *regulator_vdd;
+
+bool regulator_enabled = false;
 
 //extern bool g_station_sleep;
 //extern int lid_status;
@@ -128,6 +135,8 @@ EXPORT_SYMBOL(audio_switch);
 
 int Station_HWID = 0;
 EXPORT_SYMBOL(Station_HWID);
+
+int g_chmod_inbox = 0;
 
 /*
  * 	gDongleEvent : only for Station ( gDongleType == 2 )
@@ -290,7 +299,7 @@ static ssize_t sync_state_store(struct device *dev,
 	if (ret)
 		return ret;
 
-	if (val == 0){
+	if (val == 0 || val == 23){
 		ASUSEvtlog("[EC_HID] asus_extcon_set_state_sync : %d\n", val);
 		printk("[EC_HID][EXTCON] extcon_dongle->state : %d, val : %d\n", extcon_dongle->state, val);
 		asus_extcon_set_state_sync(extcon_dongle, val);
@@ -508,8 +517,10 @@ void update_POGO_ID_ADC_Threshold(enum asus_dongle_type type)
 static void qpnp_pogo_id_adc_notification(enum adc_tm_state state,void *ctx)
 {
 	enum asus_dongle_type type = 255;
+	int ret;
 	
 	printk("[EC_HID] : state is %d!\n",state);
+	
 	dongle_type_detect(&type);
 	
 	if(type == Dongle_ERROR|| type == Dongle_Others)
@@ -521,6 +532,47 @@ static void qpnp_pogo_id_adc_notification(enum adc_tm_state state,void *ctx)
 	update_POGO_ID_ADC_Threshold(type);
 	
 	control_pogo_det(type);
+
+	if (type == Dongle_BackCover) {
+		if (!regulator_enabled) {
+			printk("[EC_HID] enable usb2_mux2_en regulator\n");
+			
+			ret = regulator_set_voltage(regulator_vdd, 3000000, 3300000);
+			if (ret < 0)
+				printk("[EC_HID] Failed to set regulator voltage\n");
+
+			ret = regulator_set_load(regulator_vdd, 150000);
+			if (ret < 0)
+				printk("[EC_HID] Failed to set regulator current\n");
+			
+			ret = regulator_enable(regulator_vdd);
+			if (ret)
+				printk("[EC_HID] Failed to enable regulator vdda33\n");
+			
+			regulator_enabled = true;
+		}
+	} else {
+		if (regulator_enabled) {
+			printk("[EC_HID] disable usb2_mux2_en regulator\n");
+			ret = regulator_disable(regulator_vdd);
+			if (ret)
+				printk("[EC_HID] Failed to disable regulator vdda33\n");
+				
+			regulator_enabled = false;
+		}
+	}
+	
+	if (type == Dongle_INBOX5) {
+		ret = gpio_direction_output(g_hid_data->usb2_mux2_en, 0);
+		if (ret)
+			printk("[EC_HID] usb2_mux2_en output low, err %d\n", ret);
+	}
+	else if (type == Dongle_BackCover) {
+		ret = gpio_direction_output(g_hid_data->usb2_mux2_en, 1);
+		if (ret)
+			printk("[EC_HID] usb2_mux2_en output high, err %d\n", ret);
+	}
+		
 
 	blocking_notifier_call_chain(&ec_hid_event_header,gDongleType,NULL);
 	
@@ -813,7 +865,7 @@ static ssize_t usb2_mux2_store(struct device *dev,
 
 	retval = gpio_direction_output(g_hid_data->usb2_mux2_en, val);
 	if (retval)
-		printk("[EC_HID] pogo_det output high, err %d\n", retval);
+		printk("[EC_HID] usb2_mux2_en output %d, err %d\n", val, retval);
 
 //	if(val)
 //		gpio_set_value(g_hid_data->usb2_mux2_en, 1);
@@ -823,92 +875,28 @@ static ssize_t usb2_mux2_store(struct device *dev,
 	return count;
 }
 
-static ssize_t pogo_fan_on_show(struct device *dev,
+static ssize_t chmod_inbox_show(struct device *dev,
 					 struct device_attribute *mattr,
 					 char *buf)
 {
-	int val =  0;
+	printk("[EC_HID] chmod_inbox_show : %d\n", g_chmod_inbox);
 	
-	val = gpio_get_value(g_hid_data->pogo_fan_on);
-	
-	printk("[EC_HID] pogo_fan_on_show : %d\n", val);
-	
-	return sprintf(buf, "%d\n", val);
+	return sprintf(buf, "%d\n", g_chmod_inbox);
 }
 
-static ssize_t pogo_fan_on_store(struct device *dev,
+static ssize_t chmod_inbox_store(struct device *dev,
 					  struct device_attribute *mattr,
 					  const char *data, size_t count)
 {
 	int val;
 	sscanf(data, "%d", &val);
 
-	printk("[EC_HID] pogo_fan_on_store : %d\n", val);
+	printk("[EC_HID] chmod_inbox_store : %d\n", val);
 
 	if(val)
-		gpio_set_value(g_hid_data->pogo_fan_on, 1);
+		g_chmod_inbox = 1;
 	else
-		gpio_set_value(g_hid_data->pogo_fan_on, 0);
-	
-	return count;
-}
-
-static ssize_t pogo_aura_en_show(struct device *dev,
-					 struct device_attribute *mattr,
-					 char *buf)
-{
-	int val =  0;
-	
-	val = gpio_get_value(g_hid_data->pogo_aura_en);
-	
-	printk("[EC_HID] pogo_aura_en_show : %d\n", val);
-	
-	return sprintf(buf, "%d\n", val);
-}
-
-static ssize_t pogo_aura_en_store(struct device *dev,
-					  struct device_attribute *mattr,
-					  const char *data, size_t count)
-{
-	int val;
-	sscanf(data, "%d", &val);
-
-	printk("[EC_HID] pogo_aura_en_store : %d\n", val);
-
-	if(val)
-		gpio_set_value(g_hid_data->pogo_aura_en, 1);
-	else
-		gpio_set_value(g_hid_data->pogo_aura_en, 0);
-	
-	return count;
-}
-
-static ssize_t pogo_temp_intr_show(struct device *dev,
-					 struct device_attribute *mattr,
-					 char *buf)
-{
-	int val =  0;
-	
-	val = gpio_get_value(g_hid_data->pogo_temp_intr);
-	
-	printk("[EC_HID] pogo_temp_intr_show : %d\n", val);
-	
-	return sprintf(buf, "%d\n", val);
-}
-
-static ssize_t pogo_temp_intr_store(struct device *dev,
-					  struct device_attribute *mattr,
-					  const char *data, size_t count)
-{
-	int val;
-	sscanf(data, "%d", &val);
-
-	printk("[EC_HID] pogo_temp_intr_store : %d\n", val);
-
-	if(val)
-		gpio_set_value(g_hid_data->pogo_temp_intr, 1);
-	else
-		gpio_set_value(g_hid_data->pogo_temp_intr, 0);
+		g_chmod_inbox = 0;
 	
 	return count;
 }
@@ -992,9 +980,7 @@ static DEVICE_ATTR(sync_state, S_IRUGO | S_IWUSR, NULL, sync_state_store);
 static DEVICE_ATTR(gDongleEvent, S_IRUGO | S_IWUSR, gDongleEvent_show, gDongleEvent_store);
 static DEVICE_ATTR(pogo_detect, S_IRUGO | S_IWUSR, pogo_detect_show, pogo_detect_store);
 static DEVICE_ATTR(usb2_mux2, S_IRUGO | S_IWUSR, usb2_mux2_show, usb2_mux2_store);
-static DEVICE_ATTR(pogo_fan_on, S_IRUGO | S_IWUSR, pogo_fan_on_show, pogo_fan_on_store);
-static DEVICE_ATTR(pogo_aura_en, S_IRUGO | S_IWUSR, pogo_aura_en_show, pogo_aura_en_store);
-static DEVICE_ATTR(pogo_temp_intr, S_IRUGO | S_IWUSR, pogo_temp_intr_show, pogo_temp_intr_store);
+static DEVICE_ATTR(chmod_inbox, S_IRUGO | S_IWUSR, chmod_inbox_show, chmod_inbox_store);
 static DEVICE_ATTR(pogo_id_voltage, S_IRUGO | S_IWUSR, pogo_id_voltage_show, NULL);
 //static DEVICE_ATTR(pogo_sync_key, S_IRUGO | S_IWUSR, pogo_sync_key_show, pogo_sync_key_store);
 static DEVICE_ATTR(is_ec_has_removed, S_IRUGO | S_IWUSR, is_ec_has_removed_show, is_ec_has_removed_store);
@@ -1009,9 +995,7 @@ static struct attribute *ec_hid_attrs[] = {
 	&dev_attr_gDongleEvent.attr,
 	&dev_attr_pogo_detect.attr,
 	&dev_attr_usb2_mux2.attr,
-	&dev_attr_pogo_fan_on.attr,
-	&dev_attr_pogo_aura_en.attr,
-	&dev_attr_pogo_temp_intr.attr,
+	&dev_attr_chmod_inbox.attr,
 	&dev_attr_pogo_id_voltage.attr,
 //	&dev_attr_pogo_sync_key.attr,
 	&dev_attr_is_ec_has_removed.attr,
@@ -1050,7 +1034,7 @@ int ec_hid_display_notifier_call(struct notifier_block *self, unsigned long even
 	struct drm_panel_notifier *evdata = data;
 	int blank;
 
-	if (!evdata || (gDongleType != 1))
+	if (!evdata)
 		return 0;
 
 //	asus_wait4hid();
@@ -1065,13 +1049,19 @@ int ec_hid_display_notifier_call(struct notifier_block *self, unsigned long even
 		case DRM_PANEL_BLANK_POWERDOWN:
 			// panel is power down notify
 			printk("[EC_HID] DRM_PANEL_BLANK_UNBLANK,Display off");
-			hid_switch_usb_autosuspend(true);
+			g_screen_on = false;
+
+			if (gDongleType == 1)
+				hid_switch_usb_autosuspend(true);
 		break;
 
 		case DRM_PANEL_BLANK_UNBLANK:
 			// panel is power on notify
 			printk("[EC_HID] DRM_PANEL_BLANK_UNBLANK,Display on");
-			hid_switch_usb_autosuspend(false);
+			g_screen_on = true;
+
+			if (gDongleType == 1)
+				hid_switch_usb_autosuspend(false);
 		break;
 
 		default:
@@ -1082,19 +1072,13 @@ int ec_hid_display_notifier_call(struct notifier_block *self, unsigned long even
 	return NOTIFY_OK;
 }
 
-void inbox_disconnect_notifier(void)
+void inbox_connect(void)
 {
-	enum asus_dongle_type type = Dongle_default_status;
-
-	gDongleType = Dongle_NO_INSERT;
-	ec_hid_uevent();
-	
-	msleep(1000);
-	
-	dongle_type_detect(&type);
-	ec_hid_uevent();
+	printk("[EC_HID] inbox_connect\n");
+	g_chmod_inbox = 1;
+	kobject_uevent(&g_hid_data->dev->kobj, KOBJ_CHANGE);
 }
-EXPORT_SYMBOL_GPL(inbox_disconnect_notifier);
+EXPORT_SYMBOL_GPL(inbox_connect);
 
 int drm_parse_dt_panel(struct device_node *node)
 {
@@ -1141,6 +1125,13 @@ static int ec_hid_parse_dt(struct device *dev, struct ec_hid_data *ec_hid_device
 		//gpio_set_value(ec_hid_device->pogo_det, 0);
 	}
 
+	//set PM8350_L2
+	regulator_vdd = regulator_get(dev, "vdda33");
+	if (IS_ERR(regulator_vdd)) {
+		printk("%s: Failed to get regulator vdda33, retval = %d\n", __func__);
+		retval = PTR_ERR(regulator_vdd);
+	}
+			
 	//set USB2_MUX2_EN
 	ec_hid_device->usb2_mux2_en = of_get_named_gpio(np, "USB2_MUX2_EN", 0);
 	if ( gpio_is_valid(ec_hid_device->usb2_mux2_en) ) {
@@ -1152,7 +1143,7 @@ static int ec_hid_parse_dt(struct device *dev, struct ec_hid_data *ec_hid_device
 		printk("[EC_HID] usb2_mux2_en default low (usb).\n");
 		retval = gpio_direction_output(ec_hid_device->usb2_mux2_en, 0);
 		if (retval)
-			printk("[EC_HID] usb2_mux2_en output high, err %d\n", retval);
+			printk("[EC_HID] usb2_mux2_en output low, err %d\n", retval);
 
 		//gpio_set_value(ec_hid_device->usb2_mux2_en, 0);
 	}
@@ -1261,6 +1252,7 @@ static int ec_hid_probe(struct platform_device *pdev)
 // Project ROG3 default use I2S audio
 
 	audio_switch = 1;
+	g_screen_on = true;
 
 	return 0;
 

@@ -686,6 +686,10 @@ int asus_extcon_set_state_sync(struct extcon_dev *edev, int cable_state)
 	int ret;
 	unsigned long flags;
 
+	if (edev == NULL) {
+		printk("%s: Skip to set extcon(edev is NULL). \n", __func__);
+		return 0;
+	}
 	/* Check whether the external connector's state is changed. */
 	spin_lock_irqsave(&edev->lock, flags);
 	ret = asus_is_extcon_changed(edev, cable_state);

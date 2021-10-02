@@ -84,7 +84,7 @@ static int fts_fp_position[4] = {440,640, 1774, 1974};
 static int *fp_position = NULL;
 int fp_key_i= -1;
 int fp_press = 0; // 0 : up , 1 : O , 2 : F
-bool fp_filter = false;
+//bool fp_filter = false;
 ktime_t start ;
 bool first_down = false;
 unsigned int time_delta;
@@ -157,39 +157,39 @@ int fts_reset_proc(int hdelayms)
     if (hdelayms) {
         msleep(hdelayms);
     }
-
+    fts_data->wait_reset = false;
     return 0;
 }
 
 void fts_irq_disable(void)
 {
-    unsigned long irqflags;
+//    unsigned long irqflags;
 
 //    FTS_FUNC_ENTER();
-    spin_lock_irqsave(&fts_data->irq_lock, irqflags);
+//    spin_lock_irqsave(&fts_data->irq_lock, irqflags);
 
     if (!fts_data->irq_disabled) {
         disable_irq_nosync(fts_data->irq);
         fts_data->irq_disabled = true;
     }
 
-    spin_unlock_irqrestore(&fts_data->irq_lock, irqflags);
+//    spin_unlock_irqrestore(&fts_data->irq_lock, irqflags);
     FTS_FUNC_EXIT();
 }
 
 void fts_irq_enable(void)
 {
-    unsigned long irqflags = 0;
+//    unsigned long irqflags = 0;
 
     FTS_FUNC_ENTER();
-    spin_lock_irqsave(&fts_data->irq_lock, irqflags);
+//    spin_lock_irqsave(&fts_data->irq_lock, irqflags);
 
     if (fts_data->irq_disabled) {
         enable_irq(fts_data->irq);
         fts_data->irq_disabled = false;
     }
 
-    spin_unlock_irqrestore(&fts_data->irq_lock, irqflags);
+//    spin_unlock_irqrestore(&fts_data->irq_lock, irqflags);
 //    FTS_FUNC_EXIT();
 }
 
@@ -533,7 +533,7 @@ static int fts_input_report_b(struct fts_ts_data *data)
 			  data->fp_y = events[i].y;
 			  fp_press = 1;
 			  fp_key_i = events[i].id;
-			  fp_filter = true;
+			  data->fp_filter = true;
 		      } else {
 			  FTS_INFO("Finger %d down at FP area, KEY F",events[i].id);
 			  input_report_key(data->input_dev, KEY_F,1);
@@ -548,7 +548,7 @@ static int fts_input_report_b(struct fts_ts_data *data)
 			  data->fp_y = events[i].y;
 			  fp_press = 2;
 			  fp_key_i = events[i].id;
-			  fp_filter = true;
+			  data->fp_filter = true;
 		      }
 		  } else if (data-> fp_report_type == 1) {
 			  FTS_INFO("Finger %d down out of FP area,KEY L",events[i].id);
@@ -558,17 +558,14 @@ static int fts_input_report_b(struct fts_ts_data *data)
 			  input_sync(data->input_dev);
 		          fp_press = 2;
 			  fp_key_i = events[i].id;
-			  fp_filter = true;
+			  data->fp_filter = true;
 		  }
 	    }  
-	    if (fp_filter && (events[i].id == fp_key_i)) {
+	    if (data->fp_filter && (events[i].id == fp_key_i)) {
 	        if (fp_position[0] <= events[i].x && events[i].x <= fp_position[1] && 
 	          fp_position[2] <= events[i].y && events[i].y <= fp_position[3]) {
 		  //ignore , icon position not report finger down
 		} else {
-		    if (data-> fp_report_type == 0)
-		        fp_filter = false;
-
 		    if (data-> fp_report_type == 2) {
 			input_mt_report_slot_state(data->input_dev, MT_TOOL_FINGER, true);
 			input_report_abs(data->input_dev, ABS_MT_TOUCH_MAJOR, events[i].p);
@@ -585,6 +582,11 @@ static int fts_input_report_b(struct fts_ts_data *data)
 		input_report_abs(data->input_dev, ABS_MT_POSITION_X, events[i].x);
 		input_report_abs(data->input_dev, ABS_MT_POSITION_Y, events[i].y);
 	        data->finger_press = true;
+		
+		// ATR
+		if (is_atr_empty() == 1) {
+		    report_atr(events[i].time);
+		}
 	    }
 
 	    touchs |= BIT(events[i].id);
@@ -618,8 +620,8 @@ static int fts_input_report_b(struct fts_ts_data *data)
 		input_report_key(data->input_dev, KEY_U,0);
 		input_sync(data->input_dev);
 		fp_press = 0;
-		fp_filter = false;
-	    }
+		data->fp_filter = false;
+	    }	    
         }
     }
 
@@ -650,12 +652,20 @@ static int fts_input_report_b(struct fts_ts_data *data)
 	      input_report_key(data->input_dev, BTN_TOUCH, 0);
 	      FTS_INFO("touch up");
 	      fp_press = 0;
-	      fp_filter = false;
-	      if (data->perftime == 1) {
+	      data->fp_filter = false;
+	      if (fts_data->wait_reset){
+		FTS_INFO("reset tp");
+		fts_irq_disable();
+		fts_reset_proc(150);
+		report_rate_recovery(data);
+		fts_irq_enable();
+	      }
+/*	      if (data->perftime == 1) {
 		time_delta = ktime_ms_delta(ktime_get(), start);
 		FTS_INFO("touch down to up delta time %llu ms ",time_delta);
 		first_down = false;
-	      }	      
+	      }
+*/
 	    } else
 	      FTS_INFO("atr pressed, ignore touch up");
         } else {
@@ -665,8 +675,8 @@ static int fts_input_report_b(struct fts_ts_data *data)
 		  first_down = true;
 		  FTS_INFO("touch down");
 	      }
-	      input_report_key(data->input_dev, BTN_TOUCH, 1);
-	     
+	      if (!data->fp_filter)
+		  input_report_key(data->input_dev, BTN_TOUCH, 1);	     
 	    }
         }
     }
@@ -780,6 +790,7 @@ static int fts_read_parse_touchdata(struct fts_ts_data *data)
     int max_touch_num = data->pdata->max_touch_number;
     u8 *buf = data->point_buf;
     ktime_t scan_time;
+    u8 fw_tpid = 0 , mode = 0;
     
     ret = fts_read_touchdata(data);
     if (ret) {
@@ -800,20 +811,23 @@ static int fts_read_parse_touchdata(struct fts_ts_data *data)
 
     if (data->point_num > max_touch_num) {
         FTS_INFO("invalid point_num(%d)", data->point_num);
+	fts_show_touch_buffer(buf, data->pnt_buf_size);
         return -EIO;
     }
 
     for (i = 0; i < max_touch_num; i++) {
         base = FTS_ONE_TCH_LEN * i;
         pointid = (buf[FTS_TOUCH_ID_POS + base]) >> 4;
-        if (pointid >= FTS_MAX_ID)
+
+	if (pointid >= FTS_MAX_ID)
             break;
-        else if (pointid >= max_touch_num) {
+	else if (pointid >= max_touch_num) {
             FTS_ERROR("ID(%d) beyond max_touch_number", pointid);
             return -EINVAL;
         }
 
         data->touch_point++;
+	
         events[i].x = ((buf[FTS_TOUCH_X_H_POS + base] & 0x0F) << 8) +
                       (buf[FTS_TOUCH_X_L_POS + base] & 0xFF);
         events[i].y = ((buf[FTS_TOUCH_Y_H_POS + base] & 0x0F) << 8) +
@@ -853,12 +867,24 @@ static int fts_read_parse_touchdata(struct fts_ts_data *data)
 	}
         if (EVENT_DOWN(events[i].flag) && (data->point_num == 0)) {
             FTS_INFO("abnormal touch data from fw");
+	    fts_show_touch_buffer(buf, data->pnt_buf_size);
             return -EIO;
         }
     }
 
     if (data->touch_point == 0) {
         FTS_INFO("no touch point information");
+	fts_show_touch_buffer(buf, data->pnt_buf_size);
+	fts_read_reg(FTS_REG_TOUCH_ID, &fw_tpid);
+	msleep(10);
+	fts_read_reg(FTS_REG_TOUCH_MODE, &mode);
+	FTS_INFO("FW read reg 0x02: %d reg 0xA5: %d",fw_tpid,mode);
+	FTS_INFO("reset tp");
+	fts_irq_disable();
+	fts_reset_proc(150);
+	report_rate_recovery(data);
+	fts_irq_enable();
+	
         return -EIO;
     }
 
@@ -1600,18 +1626,18 @@ static int drm_notifier_callback(struct notifier_block *self,
         ts_data->display_state = 1;
         if (DRM_PANEL_EARLY_EVENT_BLANK == event) {
 	    FTS_INFO("DRM_PANEL_BLANK_UNBLANK,Display resume");
-	    if (ts_data->next_resume_isaod) {
+	} else if (DRM_PANEL_EVENT_BLANK == event) {
+	  FTS_INFO("DRM_PANEL_EVENT_BLANK,Display on");
+	  if (ts_data->next_resume_isaod) {
 	      FTS_INFO("Display resume into AOD, not care");
-	    } else { 
+	  } else { 
 	      if (fts_data->fp_report_type == 1) {
 		  FTS_INFO("resume into hbm mode");
 	      } else {
 		  fts_release_all_finger();
 		  queue_work(fts_data->ts_workqueue, &fts_data->resume_work);
 	      }
-	    }	  
-	} else if (DRM_PANEL_EVENT_BLANK == event) {
-	  //ignore
+	  }
         }
         break;
     case DRM_PANEL_BLANK_POWERDOWN:
@@ -1619,6 +1645,7 @@ static int drm_notifier_callback(struct notifier_block *self,
         FTS_INFO("DRM_PANEL_BLANK_POWERDOWN,Display off");
         if (DRM_PANEL_EARLY_EVENT_BLANK == event) {
             cancel_work_sync(&fts_data->resume_work);
+	    ts_data->fp_filter = false;
             fts_ts_suspend(ts_data->dev);
         } else if (DRM_PANEL_EVENT_BLANK == event) {
 //            FTS_INFO("suspend: event = %lu, not care", event);
@@ -1628,6 +1655,7 @@ static int drm_notifier_callback(struct notifier_block *self,
 	FTS_INFO("DRM_PANEL_BLANK_LP,Display resume into LP1/LP2");
 	ts_data->display_state = 2;
 	ts_data->next_resume_isaod = false;
+	ts_data->fp_filter = false;
 	if (!ts_data->suspended) {
 	    FTS_INFO("Display AOD mode , suspend touch");
 	    cancel_work_sync(&fts_data->resume_work);
@@ -2087,7 +2115,11 @@ static int fts_ts_resume(struct device *dev)
 #if FTS_POWER_SOURCE_CUST_EN
         fts_power_source_resume(ts_data);
 #endif
-        fts_reset_proc(150);
+	if(!ts_data->fp_filter) {
+	  fts_reset_proc(150);
+	} else {
+	  fts_data-> wait_reset = true;
+	}
     }
 
     fts_wait_tp_to_valid();
@@ -2108,6 +2140,7 @@ static int fts_ts_resume(struct device *dev)
     ts_data->suspended = false;
     fp_press = 0;
     asus_game_recovery(ts_data);
+    report_rate_recovery(ts_data);
     FTS_FUNC_EXIT();
     return 0;
 }

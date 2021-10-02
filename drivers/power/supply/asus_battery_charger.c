@@ -175,6 +175,11 @@ struct oem_get_fg_soc_resp {
 	int    fg_soc;
 };
 
+struct oem_set_ASUS_media_req {
+	struct pmic_glink_hdr	hdr;
+	u8    asus_media;
+};
+
 struct oem_set_hwid_to_ADSP_req {
 	struct pmic_glink_hdr	hdr;
 	u32    hwid_val;
@@ -226,6 +231,17 @@ struct oem_set_Adapter_ID_resp {
 	u32    adapter_id;
 };
 
+//Send cc reset req to rt1715
+struct oem_set_bot_cc_reset_msg {
+	struct pmic_glink_hdr hdr;
+	u32 reset;
+};
+
+struct oem_get_cc_status_msg {
+	struct pmic_glink_hdr hdr;
+	u32 side_cc_status;
+};
+
 struct extcon_dev	*bat_id_extcon;
 struct extcon_dev	*bat_extcon;
 struct extcon_dev	*quickchg_extcon;
@@ -239,6 +255,8 @@ extern int asus_extcon_set_state_sync(struct extcon_dev *edev, int cable_state);
 //Define the opcode
 #define OEM_ASUS_EVTLOG_IND			0x1002
 #define OEM_PD_EVTLOG_IND			0x1003
+#define OEM_ASUS_EVTLOG_PRINT_IND		0x1004
+#define OEM_ASUS_BOT_CC_RESET_IND		0x1005
 #define OME_GET_BATT_ID				0x2001
 #define OEM_GET_ADSP_PLATFORM_ID	0x2002
 #define OEM_GET_VBUS_SOURCE			0x2003
@@ -271,10 +289,12 @@ extern int asus_extcon_set_state_sync(struct extcon_dev *edev, int cable_state);
 #define OEM_SET_CHG_LIMIT_MODE2		0x2117
 
 #define OEM_SET_ADAPTER_ID_CHANGE	0x2119
+#define OEM_GET_SIDEPORT_CC_STATUS_REQ	0x2120
 
 #define OEM_GET_FW_version			0x3001
 #define OEM_GET_Batt_temp			0x3002
 #define OEM_GET_FG_SoC_REQ			0x3003
+#define OEM_SET_ASUS_media			0x3104
 //Define Message Type
 #define MSG_TYPE_REQ_RESP	1
 #define MSG_TYPE_NOTIFICATION	2
@@ -283,6 +303,9 @@ extern int asus_extcon_set_state_sync(struct extcon_dev *edev, int cable_state);
 #define SET_SLOW_CHG_MODE		0x1
 #define SET_SIDE_THM_ALT_MODE	0x2
 #define SET_BTM_THM_ALT_MODE	0x4
+#define SET_BYPASS_CHG_MODE		0x8
+
+#define AUDIO_REQ_SET_LCM_MODE	0x100
 
 //define the event ID from ADSP to HLOS
 #define ADSP_HLOS_EVT_ADUIO_INVALID 0x01
@@ -335,6 +358,7 @@ int demo_recharge_delta = 2;
 int factory_recharger_delta = 2;
 //[+++] The possible module to set usbin_suspend
 bool smartchg_stop_flag = 0;
+bool bypass_stop_flag = 0;
 bool node_usbin_suspend_flag = 0;
 bool ultra_bat_life_flag = 0;
 bool g_cos_over_full_flag = 0;
@@ -346,7 +370,7 @@ int fac_chg_limit_cap = 70;
 bool g_qxdm_en = false;//add to printk the WIFI hotspot & QXDM UTS event
 bool g_wifi_hs_en = false;//add to printk the WIFI hotspot & QXDM UTS event
 bool feature_stop_chg_flag = false;
-bool bFactoryChgLimit = false;
+//bool bFactoryChgLimit = false;
 struct wake_lock cable_resume_wake_lock;
 //[---] Add the global variables
 
@@ -354,6 +378,8 @@ struct wake_lock cable_resume_wake_lock;
 const u32 default_rt1715_src_caps[] = { 0x00019032 };	/* 5V, 500 mA */
 int default_rt1715_src_caps_size = ARRAY_SIZE(default_rt1715_src_caps);
 //[---] Add the PDO of source for RT1715
+
+bool side_port_cc_status;
 
 void monitor_charging_enable(void);
 int asus_set_vbus_attached_status(int value);
@@ -372,6 +398,8 @@ dwc3_role_switch_fn dwc3_role_switch;
 extern void msm_dwc3_register_switch(dwc3_role_switch_fn *funcPtr);
 #endif
 //[---] Add the external function
+//[CR] To reset cc pin from rt1715
+extern int typec_disable_function(bool disable);
 
 //ASUS_BSP +++ LiJen add to printk the WIFI hotspot & QXDM UTS event
 #include <linux/proc_fs.h>
@@ -446,6 +474,7 @@ void static create_uts_status_proc_file(void)
 
 void usbin_suspend_to_ADSP(int enable);
 void write_CHGLimit_value(int input);
+void get_oem_batt_temp_from_ADSP(void);
 
 //[+++] Add thermal alert adc function
 bool usb_alert_side_flag = 0;
@@ -547,6 +576,26 @@ static const char * const power_supply_usb_type_text[] = {
 	"Unknown", "SDP", "DCP", "CDP", "ACA", "C",
 	"PD", "PD_DRP", "PD_PPS", "BrickID"
 };
+
+struct delayed_work	asus_set_ASUS_media_work;
+void asus_set_ASUS_media_worker(struct work_struct *work)
+{
+	extern bool g_ASUS_Media;
+
+	struct oem_set_ASUS_media_req req_msg = { { 0 } };
+	int rc;
+
+	pr_err("g_ASUS_Media= %d\n", g_ASUS_Media);
+	req_msg.hdr.owner = PMIC_GLINK_MSG_OWNER_OEM;
+	req_msg.hdr.type = MSG_TYPE_REQ_RESP;
+	req_msg.hdr.opcode = OEM_SET_ASUS_media;
+	req_msg.asus_media = g_ASUS_Media;
+
+	rc = battery_chg_write(g_bcdev, &req_msg, sizeof(req_msg));
+	if (rc < 0) {
+		pr_err("[BAT][CHG] Failed to set asus_set_delta_soc rc=%d\n", rc);
+	}
+}
 
 static struct notifier_block fb_notif;
 static struct drm_panel *active_panel;
@@ -1529,6 +1578,32 @@ static ssize_t smartchg_stop_charging_show(struct class *c,
 }
 static CLASS_ATTR_RW(smartchg_stop_charging);
 
+static ssize_t bypass_stop_charging_store(struct class *c,
+					struct class_attribute *attr,
+					const char *buf, size_t count)
+{
+	int tmp = 0;
+
+	tmp = simple_strtol(buf, NULL, 10);
+
+	if (tmp == 0) {
+		bypass_stop_flag = 0;
+	} else if (tmp == 1) {
+		bypass_stop_flag = 1;
+	}
+	CHG_DBG("%s: bypass_stop_flag : %d\n", __func__, bypass_stop_flag);
+	//asus_set_charger_limit_mode(SET_BYPASS_CHG_MODE, bypass_stop_flag);
+	monitor_charging_enable();
+	return count;
+}
+
+static ssize_t bypass_stop_charging_show(struct class *c,
+					struct class_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", bypass_stop_flag);
+}
+static CLASS_ATTR_RW(bypass_stop_charging);
+
 static ssize_t demo_app_property_store(struct class *c,
 					struct class_attribute *attr,
 					const char *buf, size_t count)
@@ -1607,6 +1682,7 @@ static struct attribute *asuslib_class_attrs[] = {
 	&class_attr_smartchg_stop_charging.attr,
 	&class_attr_demo_app_property.attr,
 	&class_attr_cn_demo_app.attr,
+	&class_attr_bypass_stop_charging.attr,
 	NULL,
 };
 ATTRIBUTE_GROUPS(asuslib_class);
@@ -1638,6 +1714,17 @@ int asus_init_power_supply_prop(void) {
 	return 0;
 };
 
+void handle_bot_cc_reset(u32 reset)
+{
+	pr_err("[CHG] handle bot cc reset=%d", reset);
+	
+	typec_disable_function(1);
+	msleep(100);
+	typec_disable_function(0);
+	
+	return;
+}
+
 static void handle_notification(struct battery_chg_dev *bcdev, void *data,
 				size_t len)
 {
@@ -1647,12 +1734,20 @@ static void handle_notification(struct battery_chg_dev *bcdev, void *data,
 	struct oem_set_Charger_Type_resp *Update_charger_type_msg;
 	struct oem_evt_adsp_to_hlos_req *evt_adsp_to_hlos_msg;
 	struct oem_set_Adapter_ID_resp *Update_adapter_id_msg;
+	struct oem_set_bot_cc_reset_msg *bot_cc_reset_msg;
 	struct pmic_glink_hdr *hdr = data;
 	int rc;
 	static int pre_chg_type = 0;
 	static u32 pre_adapter_id = 0;
 
     switch(hdr->opcode) {
+    case OEM_ASUS_EVTLOG_PRINT_IND:
+        if (len == sizeof(*evtlog_msg)) {
+            evtlog_msg = data;
+            pr_err("[adsp] evtlog= %s\n", evtlog_msg->buf);
+            ASUSEvtlog("[BAT][ADSP]%s", evtlog_msg->buf);
+        }
+        break;
     case OEM_ASUS_EVTLOG_IND:
         if (len == sizeof(*evtlog_msg)) {
             evtlog_msg = data;
@@ -1665,6 +1760,14 @@ static void handle_notification(struct battery_chg_dev *bcdev, void *data,
             pr_err("[PD] %s\n", evtlog_msg->buf);
         }
         break;
+    case OEM_ASUS_BOT_CC_RESET_IND:
+	pr_err("[adsp] OEM_BOT_CC_RESET_Ind\n");
+
+	if(len == sizeof(*bot_cc_reset_msg)) {
+	    bot_cc_reset_msg = data;
+	    handle_bot_cc_reset(bot_cc_reset_msg->reset);
+	}
+	break;
     case OEM_SET_USB2_CLIENT:
         if (len == sizeof(*usb2_client_msg)) {
             usb2_client_msg = data;
@@ -1804,6 +1907,8 @@ static void handle_message(struct battery_chg_dev *bcdev, void *data,
 	struct oem_get_FW_version_resp *fw_version_msg;
 	struct oem_get_batt_temp_resp *batt_temp_msg;
 	struct oem_get_fg_soc_resp *fg_soc_msg;
+	struct oem_set_ASUS_media_req *set_asus_media_msg;
+	struct oem_get_cc_status_msg *get_cc_status_msg;
 
 	switch (hdr->opcode) {
 	case OEM_GET_ADSP_PLATFORM_ID:
@@ -1859,6 +1964,15 @@ static void handle_message(struct battery_chg_dev *bcdev, void *data,
 			ack_set = true;
 		} else {
 			pr_err("Incorrect response length %zu for asus_batt_temp\n",
+				len);
+		}
+		break;
+	case OEM_SET_ASUS_media:
+		if (len == sizeof(*set_asus_media_msg)) {
+			CHG_DBG("%s OEM_SET_ASUS_media successfully\n", __func__);
+			ack_set = true;
+		} else {
+			pr_err("Incorrect response length %zu for OEM_SET_CHG_LIMIT\n",
 				len);
 		}
 		break;
@@ -2078,7 +2192,16 @@ static void handle_message(struct battery_chg_dev *bcdev, void *data,
 				len);
 		}
 		break;
-
+	case OEM_GET_SIDEPORT_CC_STATUS_REQ:
+		if (len == sizeof(*get_cc_status_msg)) {
+			get_cc_status_msg = data;
+			side_port_cc_status = get_cc_status_msg->side_cc_status;
+			ack_set = true;
+		} else {
+			pr_err("Incorrect response length %zu for OEM_GET_SIDEPORT_CC_STATUS_REQ\n",
+				len);
+		}
+		break;
 	default:
 		pr_err("Unknown opcode: %u\n", hdr->opcode);
 		ack_set = true;
@@ -2141,7 +2264,7 @@ int asus_set_vbus_attached_status(int value) {
 		ASUSEvtlog("[BAT][Ser]Cable Plug-out");
 		//[+++]Reset the parameter for limiting the charging
 		feature_stop_chg_flag = false;
-		bFactoryChgLimit = false;
+		//bFactoryChgLimit = false;
 		//[---]Reset the parameter for limiting the charging
 
 		g_once_usb_thermal_side = 0;
@@ -2317,6 +2440,9 @@ void monitor_charging_enable(void)
 	int bat_capacity;
 	int rc;
 	bool demo_app_state_flag = 0;
+	bool charging_pause = 0;
+	bool feature_usbin_suspend = 0;
+	static bool pre_charging_pause = 0;
 
 	//Case 1 : For factory test, Has the highest priority to suspend USBIN
 	if (node_usbin_suspend_flag) {
@@ -2333,6 +2459,7 @@ void monitor_charging_enable(void)
 
 	//Case 2 : For Factory test, limit the max battery SoC
 	// Charger_limit_function for factory +++
+	#if 0
 	if (fac_chg_limit_en) {
 		if (bat_capacity > fac_chg_limit_cap) {
 			bFactoryChgLimit = true;
@@ -2341,6 +2468,10 @@ void monitor_charging_enable(void)
 		}
 	} else {
 		bFactoryChgLimit = false;
+	}
+	#endif
+	if (fac_chg_limit_en && bat_capacity >= fac_chg_limit_cap) {
+		charging_pause = 1;
 	}
 
 	// Case 3 : Add Maximun Battery Lifespan +++
@@ -2362,25 +2493,44 @@ void monitor_charging_enable(void)
 	//[---]Case 4 : For ww/cn demo app, limit the max battery SoC
 
 	if (cn_demo_app_flag || demo_app_state_flag || ultra_bat_life_flag || g_cos_over_full_flag) {
-		if (bat_capacity >= 60) {
+		if (bat_capacity > 60) {
+			feature_usbin_suspend = 1;
 			feature_stop_chg_flag = true;
-		} else if (bat_capacity < (60 - demo_recharge_delta)) {
+		} else if (bat_capacity >= (60 - demo_recharge_delta)) {
+			feature_usbin_suspend = 0;
+			feature_stop_chg_flag = true;
+		} else {
+			feature_usbin_suspend = 0;
 			feature_stop_chg_flag = false;
 		}
 	} else {
 		feature_stop_chg_flag = false;
+		feature_usbin_suspend = 0;
 	}
 
-	CHG_DBG("%s: bat_capacity : %d. ultra_bat_life_flag : %d, g_cos_over_full_flag : %d, smartchg_stop_flag : %d\n"
-	, __func__, bat_capacity, ultra_bat_life_flag, g_cos_over_full_flag, smartchg_stop_flag);
-	CHG_DBG("%s: fac_chg_limit_en : %d, fac_chg_limit_cap : %d, bFactoryChgLimit : %d\n"
-	, __func__, fac_chg_limit_en, fac_chg_limit_cap, bFactoryChgLimit);
+	CHG_DBG("%s: smartchg_stop_flag : %d, bypass_stop_flag : %d\n"
+	, __func__, smartchg_stop_flag, bypass_stop_flag);
+	CHG_DBG("%s: bat_capacity : %d. ultra_bat_life_flag : %d, g_cos_over_full_flag : %d\n"
+	, __func__, bat_capacity, ultra_bat_life_flag, g_cos_over_full_flag);
+	CHG_DBG("%s: fac_chg_limit_en : %d, fac_chg_limit_cap : %d\n"
+	, __func__, fac_chg_limit_en, fac_chg_limit_cap);
 	CHG_DBG("%s: demo_app_property_flag : %d, demo_app_state_flag : %d, cn_demo_app_flag : %d\n"
 	, __func__, demo_app_property_flag, demo_app_state_flag, cn_demo_app_flag);
 
+	if (smartchg_stop_flag || bypass_stop_flag || feature_stop_chg_flag) {
+		charging_pause = 1;
+	}
+
+	CHG_DBG("%s: charging_pause : %d, pre_charging_pause : %d\n", __func__, charging_pause, pre_charging_pause);
+	if (charging_pause != pre_charging_pause) {
+		asus_set_charger_limit_mode(SET_BYPASS_CHG_MODE, charging_pause);
+		pre_charging_pause = charging_pause;
+	}
+
+	CHG_DBG("%s: g_once_usb_thermal_btm : %d, g_once_usb_thermal_side : %d, feature_usbin_suspend : %d\n",
+			__func__, g_once_usb_thermal_btm, g_once_usb_thermal_side, feature_usbin_suspend);
 	//Check if to set usbin_suspend to ADSP
-	if (feature_stop_chg_flag || bFactoryChgLimit || smartchg_stop_flag
-		|| g_once_usb_thermal_btm || g_once_usb_thermal_side) {
+	if (g_once_usb_thermal_btm || g_once_usb_thermal_side || feature_usbin_suspend) {
 		usbin_suspend_to_ADSP(1);
 	} else {
 		usbin_suspend_to_ADSP(0);
@@ -2564,6 +2714,13 @@ void set_qc_stat(int status)
 		return;
 	}
 
+	if (!g_vbus_plug) {
+		cancel_delayed_work(&asus_set_qc_state_work);
+		asus_extcon_set_state_sync(quickchg_extcon, SWITCH_LEVEL0_DEFAULT);
+		CHG_DBG("%s: status: %d, switch: %d\n", __func__, status, SWITCH_LEVEL0_DEFAULT);
+		return;
+	}
+
 	switch (status) {
 	//"qc" stat happends in charger mode only, refer to smblib_get_prop_batt_status
 	case POWER_SUPPLY_STATUS_CHARGING:
@@ -2571,15 +2728,12 @@ void set_qc_stat(int status)
 	case POWER_SUPPLY_STATUS_FULL:
 		CHG_DBG("%s: status: %d, switch: %d\n", __func__, status, g_SWITCH_LEVEL);
 		cancel_delayed_work(&asus_set_qc_state_work);
-		if (g_Charger_mode)
+		//if (g_Charger_mode)
 			schedule_delayed_work(&asus_set_qc_state_work, 0);
-		else
-			schedule_delayed_work(&asus_set_qc_state_work, msecs_to_jiffies(3000));
+		//else
+		//schedule_delayed_work(&asus_set_qc_state_work, msecs_to_jiffies(3000));
 		break;
 	default:
-		cancel_delayed_work(&asus_set_qc_state_work);
-		asus_extcon_set_state_sync(quickchg_extcon, SWITCH_LEVEL0_DEFAULT);
-		CHG_DBG("%s: status: %d, switch: %d\n", __func__, status, SWITCH_LEVEL0_DEFAULT);
 		break;
 	}
 }
@@ -2592,6 +2746,8 @@ static int print_battery_status(void)
 	char battInfo[256];
 	int bat_cap = 0, bat_fcc = 0, bat_vol = 0, bat_cur = 0, bat_temp = 0, chg_sts = 0, bat_health = 0;
 	char UTSInfo[256]; //ASUS_BSP add to printk the WIFI hotspot & QXDM UTS event
+
+	get_oem_batt_temp_from_ADSP();
 
 	rc = power_supply_get_property(qti_phy_bat, POWER_SUPPLY_PROP_CAPACITY, &prop);
 	if (rc < 0)
@@ -2641,10 +2797,11 @@ static int print_battery_status(void)
 		bat_cap,
 		bat_vol/1000,
 		bat_cur/1000);
-	snprintf(battInfo, sizeof(battInfo), "%sTemp:%d.%dC, BATID:%d, CHG_Status:%d(%s), QC_Extcon:%d(%s), BAT_HEALTH:%s\n",
+	snprintf(battInfo, sizeof(battInfo), "%sgaugeTemp:%d.%dC, pmicTemp:%dC, BATID:%d, CHG_Status:%d(%s), QC_Extcon:%d(%s), BAT_HEALTH:%s\n",
 		battInfo,
 		bat_temp/10,
 		bat_temp%10,
+		ChgPD_Info.batt_temp,
 		ChgPD_Info.BATT_ID,
 		chg_sts,
 		charging_stats[chg_sts],
@@ -2716,16 +2873,36 @@ void usbin_suspend_to_ADSP(int enable)
 {
 	struct oem_usbin_suspend_en_req req_msg = { { 0 } };
 	int rc = 0;
+	static int pre_enable = 0;
 
 	req_msg.hdr.owner = PMIC_GLINK_MSG_OWNER_OEM;
 	req_msg.hdr.type = MSG_TYPE_REQ_RESP;
 	req_msg.hdr.opcode = OEM_SET_USBIN_SUSPNED;
 	req_msg.enable = enable;
 
-	CHG_DBG("%s. enable : %d", __func__, req_msg.enable);
+	CHG_DBG("%s. enable : %d, pre_enable : %d", __func__, req_msg.enable, pre_enable);
+	if (req_msg.enable != pre_enable) {
+		rc = battery_chg_write(g_bcdev, &req_msg, sizeof(req_msg));
+		if (rc < 0) {
+			pr_err("Failed to set USBIN_SUSPEND_EN rc=%d\n", rc);
+			return;
+		}
+		pre_enable = req_msg.enable;
+	}
+}
+
+void get_oem_batt_temp_from_ADSP(void)
+{
+	struct oem_get_batt_temp_req req_msg = {};
+	int rc;
+
+	req_msg.hdr.owner = PMIC_GLINK_MSG_OWNER_OEM;
+	req_msg.hdr.type = MSG_TYPE_REQ_RESP;
+	req_msg.hdr.opcode = OEM_GET_Batt_temp;
+
 	rc = battery_chg_write(g_bcdev, &req_msg, sizeof(req_msg));
 	if (rc < 0) {
-		pr_err("Failed to set USBIN_SUSPEND_EN rc=%d\n", rc);
+		pr_err("Failed to get FW_version rc=%d\n", rc);
 		return;
 	}
 }
@@ -2759,6 +2936,33 @@ void write_CHGLimit_value(int input)
 	CHG_DBG("%s : %s\n", __func__, buf);
 }
 /* --- Add Maximun Battery Lifespan --- */
+
+//[+++] Add the interface for audio driver request to set PMIC LCM status
+int audio_req_set_lcm_mode(bool enable) {
+	int rc = 0;
+
+	CHG_DBG("%s. enable : %d\n", __func__, enable);
+	rc = asus_set_charger_limit_mode(AUDIO_REQ_SET_LCM_MODE, enable);
+	return rc;
+}
+EXPORT_SYMBOL(audio_req_set_lcm_mode);
+//[---] Add the interface for audio driver request to set PMIC LCM status
+
+void get_cc_status_from_ADSP(void)
+{
+	struct oem_get_batt_temp_req req_msg = {};
+	int rc;
+
+	req_msg.hdr.owner = PMIC_GLINK_MSG_OWNER_OEM;
+	req_msg.hdr.type = MSG_TYPE_REQ_RESP;
+	req_msg.hdr.opcode = OEM_GET_SIDEPORT_CC_STATUS_REQ;
+
+	rc = battery_chg_write(g_bcdev, &req_msg, sizeof(req_msg));
+	if (rc < 0) {
+		pr_err("Failed to get CC_status rc=%d\n", rc);
+		return;
+	}
+}
 
 int asuslib_init(void) {
 	int rc = 0;
@@ -2928,6 +3132,9 @@ int asuslib_init(void) {
 
 	INIT_DELAYED_WORK(&asus_update_batt_status_work, asus_update_batt_status_worker);
 	schedule_delayed_work(&asus_update_batt_status_work, msecs_to_jiffies(5000));
+
+	INIT_DELAYED_WORK(&asus_set_ASUS_media_work, asus_set_ASUS_media_worker);
+	schedule_delayed_work(&asus_set_ASUS_media_work, msecs_to_jiffies(6000));
 
 	create_uts_status_proc_file(); //ASUS_BSP LiJen add to printk the WIFI hotspot & QXDM UTS event
 

@@ -150,33 +150,33 @@ int fts_reset_proc(int hdelayms)
 
 void fts_irq_disable(void)
 {
-    unsigned long irqflags;
+//    unsigned long irqflags;
 
 //    FTS_FUNC_ENTER();
-    spin_lock_irqsave(&fts_data->irq_lock, irqflags);
+//    spin_lock_irqsave(&fts_data->irq_lock, irqflags);
 
     if (!fts_data->irq_disabled) {
         disable_irq_nosync(fts_data->irq);
         fts_data->irq_disabled = true;
     }
 
-    spin_unlock_irqrestore(&fts_data->irq_lock, irqflags);
+//    spin_unlock_irqrestore(&fts_data->irq_lock, irqflags);
 //    FTS_FUNC_EXIT();
 }
 
 void fts_irq_enable(void)
 {
-    unsigned long irqflags = 0;
+//    unsigned long irqflags = 0;
 
 //    FTS_FUNC_ENTER();
-    spin_lock_irqsave(&fts_data->irq_lock, irqflags);
+//    spin_lock_irqsave(&fts_data->irq_lock, irqflags);
 
     if (fts_data->irq_disabled) {
         enable_irq(fts_data->irq);
         fts_data->irq_disabled = false;
     }
 
-    spin_unlock_irqrestore(&fts_data->irq_lock, irqflags);
+//    spin_unlock_irqrestore(&fts_data->irq_lock, irqflags);
 //    FTS_FUNC_EXIT();
 }
 

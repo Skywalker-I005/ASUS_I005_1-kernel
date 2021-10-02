@@ -29,6 +29,11 @@
 	qcom,platform-err-fg-gpio = <&tlmm 27 0>;
 
 	qcom,ulps-enabled;
+
+	// enable esd check
+	//qcom,esd-check-enabled;
+	//qcom,mdss-dsi-panel-status-check-mode = "te_signal_check";
+
 	qcom,dsi-select-clocks = "mux_byte_clk0", "mux_pixel_clk0";
 	qcom,mdss-dsi-display-timings {
 		timing@0 {
@@ -93,6 +98,11 @@
 	qcom,platform-err-fg-gpio = <&tlmm 27 0>;
 
 	qcom,ulps-enabled;
+
+	// enable esd check
+	//qcom,esd-check-enabled;
+	//qcom,mdss-dsi-panel-status-check-mode = "te_signal_check";
+
 	qcom,dsi-select-clocks = "mux_byte_clk0", "mux_pixel_clk0";
 	qcom,mdss-dsi-display-timings {
 		timing@0 {
@@ -395,6 +405,11 @@
                                 0x08 0x01
                                 0x03 0x0F>;
 	};
+	
+	ms51@16 {
+		compatible = "ms51_backcover";
+		reg = <0x16>;
+	};
 };
 
 
@@ -481,6 +496,8 @@
 		io-channels = <&pmk8350_vadc PM8350_ADC7_AMUX_THM4>;
 		io-channel-names ="asus_pogo_vadc";
 		qcom,pogo-id-adc_tm = <&pmk8350_adc_tm PM8350_ADC7_AMUX_THM4>;
+
+		vdda33-supply = <&pm8350_l2>;
 
 		POGO_DET = <&tlmm 166 0x0>;
 		USB2_MUX2_EN = <&tlmm 45 0x0>;

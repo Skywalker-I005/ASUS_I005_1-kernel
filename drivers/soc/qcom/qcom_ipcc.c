@@ -88,8 +88,11 @@ static irqreturn_t qcom_ipcc_irq_fn(int irq, void *data)
 
 		virq = irq_find_mapping(proto_data->irq_domain, packed_id);
 
+        //[PM_debug+++]
 		dev_dbg(proto_data->dev,
 			"IRQ for client_id: %u; signal_id: %u; virq: %d\n",
+		//printk("qcom_ipcc_irq_fn:IRQ for client_id: %u; signal_id: %u; virq: %d\n",
+        //[PM_debug---]
 			qcom_ipcc_get_client_id(packed_id),
 			qcom_ipcc_get_signal_id(packed_id), virq);
 
@@ -349,7 +352,13 @@ static int qcom_ipcc_pm_resume(struct device *dev)
 	else if (desc->action && desc->action->name)
 		name = desc->action->name;
 
-	pr_warn("%s: %d triggered %s (client-id: %u; signal-id: %u\n",
+#if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT
+	//[PM_debug+++]
+    pr_err("%s: %d triggered %s (client-id: %u; signal-id: %u\n",
+    //[PM_debug---]
+#else
+    pr_warn("%s: %d triggered %s (client-id: %u; signal-id: %u\n",
+#endif
 		__func__, virq, name, qcom_ipcc_get_client_id(packed_id),
 		qcom_ipcc_get_signal_id(packed_id));
 
@@ -485,7 +494,7 @@ static int resume(struct platform_device *pdev)
 	else if (desc->action && desc->action->name)
 		name = desc->action->name;
 
-	pr_warn("%s: %d triggered %s (client-id: %u; signal-id: %u\n",
+	pr_err("%s: %d triggered %s (client-id: %u; signal-id: %u\n",
 		__func__, virq, name, qcom_ipcc_get_client_id(packed_id),
 		qcom_ipcc_get_signal_id(packed_id));
 

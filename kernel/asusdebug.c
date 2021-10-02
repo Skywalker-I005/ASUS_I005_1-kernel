@@ -1018,7 +1018,7 @@ static void do_write_event_worker(struct work_struct *work)
 		ksys_chown(ASUS_EVTLOG_PATH ".txt", AID_SDCARD_RW, AID_SDCARD_RW);
 
 		size = ksys_lseek(g_hfileEvtlog, 0, SEEK_END);
-		if (size >= SZ_512K) {
+		if (size >= SZ_8M) {
 			ksys_close(g_hfileEvtlog);
 			ksys_unlink(ASUS_EVTLOG_PATH "_old.txt");
 			sys_rename1(ASUS_EVTLOG_PATH ".txt", ASUS_EVTLOG_PATH "_old.txt");

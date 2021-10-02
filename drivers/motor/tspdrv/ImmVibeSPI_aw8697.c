@@ -518,7 +518,7 @@ static void aw8697_gain_routine(struct work_struct *work)
 	struct aw8697 *aw8697 =
 	    container_of(work, struct aw8697, gain_work.work);
 
-	//pr_info("%s enter: gain=%d gain_trig=%d\n", __func__, aw8697->gain, aw8697->gain_trig);
+	pr_info("%s enter: gain=%d gain_trig=%d\n", __func__, aw8697->gain, aw8697->gain_trig);
 	aw8697->gain = aw8697->gain_trig;
 	aw8697_haptic_set_gain(aw8697, aw8697->gain_trig);
 }
@@ -771,6 +771,11 @@ static int aw8697_haptic_stop(struct aw8697 *aw8697)
 	aw8697_haptic_play_go(aw8697, false);
 	aw8697_haptic_stop_delay(aw8697);
 	aw8697_haptic_play_mode(aw8697, AW8697_HAPTIC_STANDBY_MODE);
+	//Daniel 20210223 modify start
+	aw8697_i2c_write_bits(aw8697, AW8697_REG_SYSCTRL,
+		AW8697_BIT_SYSCTRL_BST_MODE_MASK,
+		AW8697_BIT_SYSCTRL_BST_MODE_BOOST);
+	//Daniel 20210223 modify end
 
 	return 0;
 }
@@ -1645,7 +1650,7 @@ static int aw8697_rtp_osc_calibration(struct aw8697 *aw8697)
 	aw8697_i2c_write_bits(aw8697, AW8697_REG_DBGCTRL,
 			      AW8697_BIT_DBGCTRL_INT_MODE_MASK,
 			      AW8697_BIT_DBGCTRL_INT_MODE_EDGE);
-	disable_irq(gpio_to_irq(aw8697->irq_gpio));
+	disable_irq_nosync(gpio_to_irq(aw8697->irq_gpio));
 	/* haptic start */
 	aw8697_haptic_start(aw8697);
 	pm_qos_add_request(&pm_qos_req_vb, PM_QOS_CPU_DMA_LATENCY, PM_QOS_VALUE_VB);
@@ -4702,6 +4707,11 @@ static void aw8697_vibrator_work_routine(struct work_struct *work)
 					(aw8697->duration % 1000) * 1000000),
 			      HRTIMER_MODE_REL);
 	}
+	if (aw8697->play_mode == 0)
+	{
+		pr_info("%s gain set aw8697->play_mode%d\n", __func__, aw8697->play_mode);
+		schedule_delayed_work(&aw8697->gain_work, msecs_to_jiffies(100));
+	}
 	mutex_unlock(&aw8697->lock);
 }
 
@@ -4817,6 +4827,8 @@ static irqreturn_t aw8697_irq(int irq, void *data)
 	unsigned char dbg_val = 0;
 	unsigned int buf_len = 0;
 	unsigned char glb_state_val = 0;
+	//Daniel 20210223 modify start
+	unsigned char sysst_val = 0;
 
 	//pr_info("%s enter\n", __func__);
 
@@ -4825,15 +4837,18 @@ static irqreturn_t aw8697_irq(int irq, void *data)
 	aw8697_i2c_read(aw8697, AW8697_REG_DBGSTAT, &dbg_val);
 	//pr_info("%s: reg DBGSTAT=0x%x\n", __func__, dbg_val);
 	//pr_info("%s: reg SYSINT=0x%x DBGSTAT=0x%x\n", __func__, reg_val, dbg_val);
+	aw8697_i2c_read(aw8697, AW8697_REG_SYSST, &sysst_val);
 
 	if (reg_val & AW8697_BIT_SYSINT_OVI) {
 		aw8697_op_clean_status(aw8697);
 		pr_err("%s chip ov int error\n", __func__);
 	}
-	if (reg_val & AW8697_BIT_SYSINT_UVLI) {
+	if ((reg_val & AW8697_BIT_SYSINT_UVLI) &&
+		(sysst_val & AW8697_BIT_SYSST_UVLS)) {
 		aw8697_op_clean_status(aw8697);
 		pr_err("%s chip uvlo int error\n", __func__);
 	}
+	//Daniel 20210223 modify end
 	if (reg_val & AW8697_BIT_SYSINT_OCDI) {
 		aw8697_op_clean_status(aw8697);
 		pr_err("%s chip over current int error\n", __func__);

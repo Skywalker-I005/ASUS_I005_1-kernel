@@ -120,6 +120,47 @@
  *    ====================================
  */
 
+&qupv3_se0_i2c {
+	ms51@16 {
+		nuvoton,lgf_id = <&tlmm 42 0x0>;
+
+		pinctrl-names = "active", "release";
+		pinctrl-0 = <&lgf_gpio_active>;
+		pinctrl-1 = <&lgf_gpio_release>;
+	};
+};
+
+&tlmm{
+	lgf_gpio_active {
+		lgf_gpio_active: lgf_gpio_active {
+			mux {
+				pins = "gpio42";
+				function = "gpio";
+			};
+			config {
+				pins = "gpio42";
+				bias-pull-up;
+				input-enable;
+				drive-strength = <16>;
+			};
+		};
+	};
+	lgf_gpio_release {
+		lgf_gpio_release: lgf_gpio_release {
+			mux {
+				pins = "gpio42";
+				function = "gpio";
+			};
+			config {
+				pins = "gpio42";
+				input-enable;
+				bias-pull-down;
+				drive-strength = <16>;
+			};
+		};
+	};
+};
+
 //ASUS_BSP PMOLED +++
 &qupv3_se19_spi {
 	ssd1362@0 {

@@ -854,6 +854,25 @@ static int check_country_code(char *str)
 }
 __setup("androidboot.country_code=", check_country_code);
 
+bool g_ASUS_Media = false;
+EXPORT_SYMBOL(g_ASUS_Media);
+static int set_media_flag(char *str)
+{
+        if ( strcmp("Y", str) == 0 )
+        {
+                g_ASUS_Media = true;
+                printk("Kernel MEDIA DEV = Y\n");
+        }
+        else
+        {
+                g_ASUS_Media = false;
+                printk("Kernel MEDIA DEV  = N\n");
+        }
+
+        printk("g_ASUS_Media = %d\n", g_ASUS_Media);
+        return 0;
+}
+__setup("androidboot.media=", set_media_flag);
 #endif //ASUS_ZS673KS_PROJECT || ASUS_PICASSO_PROJECT
 //  --- ASUS_BSP : parse cmdline to load eu/build.prop
 

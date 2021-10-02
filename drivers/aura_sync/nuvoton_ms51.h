@@ -49,7 +49,8 @@ struct ms51_platform_data {
 	bool suspend_state;
 
 	struct pinctrl *pinctrl;
-	struct pinctrl_state *pins_active;
+	struct pinctrl_state *lgf_gpio_active;
+	struct pinctrl_state *lgf_gpio_release;
 
 	struct mutex ms51_mutex;
 

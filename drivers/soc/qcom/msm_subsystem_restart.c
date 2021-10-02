@@ -1200,6 +1200,12 @@ int subsystem_restart_dev(struct subsys_device *dev)
 		return 0;
 	}
 
+	if(strcmp(name, "adsp") == 0)
+	{
+		printk("ssr adsp, force to related ssr");
+		dev->restart_level  = RESET_SUBSYS_COUPLED;
+	}
+
 	switch (dev->restart_level) {
 
 	case RESET_SUBSYS_COUPLED:

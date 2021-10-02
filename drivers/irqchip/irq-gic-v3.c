@@ -36,6 +36,11 @@
 
 #include "irq-gic-common.h"
 
+#if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT
+//[PM_debug+++]
+int qrtr_first_msg = 0;
+//[PM_debug---]
+#endif
 #define GICD_INT_NMI_PRI	(GICD_INT_DEF_PRI & ~0x80)
 
 #define FLAGS_WORKAROUND_GICR_WAKER_MSM8996	(1ULL << 0)
@@ -624,6 +629,9 @@ static void gic_show_resume_irq(struct gic_chip_data *gic)
 		gic_irq_cnt++;
 		pr_warn("%s: irq:%d hwirq:%u triggered %s\n",
 			 __func__, irq, i, name);
+#if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT        
+        qrtr_first_msg = 1; //You could try filter out the irq name by yourself.
+#endif        
 	}
 	printk("irq count: %d\n", gic_irq_cnt);        
     //[PM_debug ---]

@@ -10,8 +10,8 @@
 #include <linux/timer.h>
 
 //[PM_debug +++]
-/*#define PM_UNATTENDED_TIMEOUT   1000*60*10		//10min*/
-#define PM_UNATTENDED_TIMEOUT   1000*20		//20s
+#define PM_UNATTENDED_TIMEOUT   1000*60*10		//10min
+/*#define PM_UNATTENDED_TIMEOUT   1000*20		//20s*/
 
 extern void __pm_printk(const char *fmt, ...);
 #define pm_printk(fmt, ...) \
