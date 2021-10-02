@@ -264,7 +264,7 @@
  * NOTE: if FTS_GET_MODULE_NUM > 1, it's the fw corresponding with FTS_VENDOR_ID
  */
 
-#define FTS_UPGRADE_FW_FILE                      "include/firmware/ASUS_ROG5_V2F_D01_20210507_app.i"
+#define FTS_UPGRADE_FW_FILE                      "include/firmware/ASUS_ROG5_V30_D01_20210525_app.i"
 
 /*
  * if FTS_GET_MODULE_NUM >= 2, fw corrsponding with FTS_VENDOR_ID2
