@@ -457,6 +457,7 @@ struct fts_test {
     struct timeval tv;
 #endif
     struct ini_data ini;
+    bool differ_test;
 };
 
 struct test_funcs {

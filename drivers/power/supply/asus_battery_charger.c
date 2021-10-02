@@ -3338,6 +3338,7 @@ int asuslib_init(void) {
 
 	CHG_DBG("%s:g_vbus_plug=%d\n", __func__, g_vbus_plug);
 	if (g_vbus_plug) {
+		ASUSEvtlog("[BAT][Ser]Cable Plug-in booting");
 		schedule_delayed_work(&asus_min_check_work, 0);
 	}
 

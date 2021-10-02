@@ -2089,13 +2089,26 @@ static ssize_t fts_test_store(
     return count;
 }
 
+static ssize_t fts_test_differ_store(
+    struct device *dev,
+    struct device_attribute *attr, const char *buf, size_t count)
+{
+    if (FTS_SYSFS_ECHO_ON(buf)) {
+        fts_ftest->differ_test = true;
+    } else if (FTS_SYSFS_ECHO_OFF(buf)) {
+        fts_ftest->differ_test = false;
+    }
+    return count;
+}
+
 /*  test from test.ini
 *    example:echo "***.ini" > fts_test
 */
 static DEVICE_ATTR(fts_test, S_IRUGO | S_IWUSR, fts_test_show, fts_test_store);
-
+static DEVICE_ATTR(fts_test_differ, S_IRUGO | S_IWUSR, NULL, fts_test_differ_store);
 static struct attribute *fts_test_attributes[] = {
     &dev_attr_fts_test.attr,
+    &dev_attr_fts_test_differ.attr,
     NULL
 };
 

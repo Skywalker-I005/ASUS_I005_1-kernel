@@ -3255,42 +3255,33 @@ static void dwc3_ext_event_notify(struct dwc3_msm *mdwc)
 	/* Flush processing any pending events before handling new ones */
 	flush_delayed_work(&mdwc->sm_work);
 
-	dev_info(mdwc->dev, "[USB] %s enter: mdwc->inputs:%x hs_phy_flags:%x\n", __func__,
-				mdwc->inputs, mdwc->hs_phy->flags);
 	dbg_log_string("enter: mdwc->inputs:%x hs_phy_flags:%x\n",
 				mdwc->inputs, mdwc->hs_phy->flags);
 	if (mdwc->id_state == DWC3_ID_FLOAT) {
-		dev_info(mdwc->dev, "[USB] XCVR: ID set\n");
 		dbg_log_string("XCVR: ID set\n");
 		set_bit(ID, &mdwc->inputs);
 	} else {
-		dev_info(mdwc->dev, "[USB] XCVR: ID clear\n");
 		dbg_log_string("XCVR: ID clear\n");
 		clear_bit(ID, &mdwc->inputs);
 	}
 
 	if (mdwc->vbus_active && !mdwc->in_restart) {
 		if (mdwc->hs_phy->flags & EUD_SPOOF_DISCONNECT) {
-			dev_info(mdwc->dev, "[USB] XCVR: BSV clear\n");
 			dbg_log_string("XCVR: BSV clear\n");
 			clear_bit(B_SESS_VLD, &mdwc->inputs);
 		} else {
-			dev_info(mdwc->dev, "[USB] XCVR: BSV set\n");
 			dbg_log_string("XCVR: BSV set\n");
 			set_bit(B_SESS_VLD, &mdwc->inputs);
 		}
 	} else {
-		dev_info(mdwc->dev, "[USB] XCVR: BSV clear\n");
 		dbg_log_string("XCVR: BSV clear\n");
 		clear_bit(B_SESS_VLD, &mdwc->inputs);
 	}
 
 	if (mdwc->suspend) {
-		dev_info(mdwc->dev, "[USB] XCVR: SUSP set\n");
 		dbg_log_string("XCVR: SUSP set\n");
 		set_bit(B_SUSPEND, &mdwc->inputs);
 	} else {
-		dev_info(mdwc->dev, "[USB] XCVR: SUSP clear\n");
 		dbg_log_string("XCVR: SUSP clear\n");
 		clear_bit(B_SUSPEND, &mdwc->inputs);
 	}
@@ -3365,7 +3356,6 @@ static void dwc3_resume_work(struct work_struct *w)
 	char *eud_str;
 	int ret = 0;
 
-	dev_info(mdwc->dev, "[USB] %s: dwc3 resume work\n", __func__);
 	dbg_log_string("resume_work: ext_idx:%d\n", mdwc->ext_idx);
 
 	if (mdwc->extcon && mdwc->vbus_active && !mdwc->in_restart) {
@@ -3386,7 +3376,6 @@ static void dwc3_resume_work(struct work_struct *w)
 	}
 
 	dwc->maximum_speed = dwc->max_hw_supp_speed;
-	dev_info(mdwc->dev, "[USB] %s: max_hw_supp_speed=%d\n", __func__, dwc->maximum_speed);
 	/* Check speed and Type-C polarity values in order to configure PHY */
 	if (edev && extcon_get_state(edev, extcon_id)) {
 		ret = extcon_get_property(edev, extcon_id,
@@ -3410,7 +3399,6 @@ static void dwc3_resume_work(struct work_struct *w)
 	}
 
 skip_update:
-	dev_info(mdwc->dev, "[USB] %s: override_usb_speed=%d, max_speed=%d\n", __func__, mdwc->override_usb_speed, dwc->maximum_speed);
 	dbg_log_string("max_speed:%d hw_supp_speed:%d override_speed:%d",
 		dwc->maximum_speed, dwc->max_hw_supp_speed,
 		mdwc->override_usb_speed);
@@ -3421,7 +3409,7 @@ skip_update:
 	}
 
 	dbg_event(0xFF, "speed", dwc->maximum_speed);
-	dev_info(mdwc->dev, "[USB] %s: speed=%d\n", __func__, dwc->maximum_speed);
+	dev_info(mdwc->dev, "[USB] %s: speed=%d (hw_supp_speed:%d override_speed:%d)\n", __func__, dwc->maximum_speed, dwc->max_hw_supp_speed, mdwc->override_usb_speed);
 
 	/*
 	 * Skip scheduling sm work if no work is pending. When boot-up

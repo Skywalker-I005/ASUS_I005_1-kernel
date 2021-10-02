@@ -552,10 +552,14 @@ static int chg_tcp_notifer_call(struct notifier_block *nb,
 			}
 			break;
 		case PD_CONNECT_PE_READY_SNK_APDO:
-			pr_info("%s tcpc_pd_state = PD_CONNECT_PE_READY_SNK_APDO\n", __func__);
+			dpm_flags = tcpm_inquire_dpm_flags(tcpc);
+			info->peer_usb_comm = (dpm_flags &= DPM_FLAGS_PARTNER_USB_COMM);
+			pr_info("%s tcpc_pd_state = PD_CONNECT_PE_READY_SNK_APDO, USB_COMM = %d\n", __func__, info->peer_usb_comm);
 			/* TODO: pps event */
 			rt1715_pdo_notify();
 			rt1715_vid_notify();
+			if (info->peer_usb_comm && tcpc_pre_typec_state == TYPEC_UNATTACHED)
+				rt1715_dwc3_msm_usb_set_role(USB_ROLE_DEVICE);
 			break;
 		case PD_CONNECT_NONE:
 			pr_info("%s tcpc_pd_state = PD_CONNECT_NONE\n", __func__);

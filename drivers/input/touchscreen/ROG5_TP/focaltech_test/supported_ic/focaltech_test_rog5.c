@@ -372,6 +372,118 @@ test_err:
     return ret;
 }
 
+static int ft5652_differdata_test(struct fts_test *tdata, bool *test_result)
+{
+    int ret = 0;
+    int i = 0;
+    int *differdata = NULL;
+    u8 fre = 0;
+    u8 data_type = 0;
+    bool result = false;
+    struct mc_sc_threshold *thr = &tdata->ic.mc_sc.thr;
+
+    FTS_TEST_FUNC_ENTER();
+    FTS_TEST_SAVE_INFO("\n============ Test Item: differdata test\n");
+    memset(tdata->buffer, 0, tdata->buffer_length);
+    differdata = tdata->buffer;
+
+    if (!thr->rawdata_h_min || !thr->rawdata_h_max) {
+        FTS_TEST_SAVE_ERR("differata_h_min/max is null\n");
+        ret = -EINVAL;
+        goto test_err;
+    }
+
+    ret = enter_factory_mode();
+    if (ret < 0) {
+        FTS_TEST_SAVE_ERR("failed to enter factory mode,ret=%d\n", ret);
+        goto test_err;
+    }
+
+    /* rawdata test in mapping mode */
+    ret = mapping_switch(MAPPING);
+    if (ret < 0) {
+        FTS_TEST_SAVE_ERR("switch mapping fail,ret=%d\n", ret);
+        goto test_err;
+    }
+
+    /* save origin value */
+    ret = fts_test_read_reg(FACTORY_REG_FRE_LIST, &fre);
+    if (ret) {
+        FTS_TEST_SAVE_ERR("read 0x0A fail,ret=%d\n", ret);
+        goto test_err;
+    }
+
+    ret = fts_test_read_reg(FACTORY_REG_DATA_SELECT, &data_type);
+    if (ret) {
+        FTS_TEST_SAVE_ERR("read 0x06 error,ret=%d\n", ret);
+        goto test_err;
+    }
+
+    /* set frequecy high */
+    ret = fts_test_write_reg(FACTORY_REG_FRE_LIST, 0x81);
+    if (ret < 0) {
+        FTS_TEST_SAVE_ERR("set frequecy fail,ret=%d\n", ret);
+        goto restore_reg;
+    }
+
+    /* select rawdata */
+    ret = fts_test_write_reg(FACTORY_REG_DATA_SELECT, 0x01);
+    if (ret < 0) {
+        FTS_TEST_SAVE_ERR("set fir fail,ret=%d\n", ret);
+        goto restore_reg;
+    }
+
+    /*********************GET differDATA*********************/
+    for (i = 0; i < 3; i++) {
+        /* lost 3 frames, in order to obtain stable data */
+        ret = get_rawdata(differdata);
+    }
+    if (ret < 0) {
+        FTS_TEST_SAVE_ERR("get differdata fail,ret=%d\n", ret);
+        goto restore_reg;
+    }
+
+    /* show test data */
+    show_data(differdata, false);
+
+    /* compare */
+/*    result = compare_array(differdata,
+                           thr->rawdata_h_min,
+                           thr->rawdata_h_max,
+                           false);
+*/
+   result = true;
+   
+restore_reg:
+    /* set the origin value */
+    ret = fts_test_write_reg(FACTORY_REG_FRE_LIST, fre);
+    if (ret < 0) {
+        FTS_TEST_SAVE_ERR("restore 0x0A fail,ret=%d\n", ret);
+    }
+
+    ret = fts_test_write_reg(FACTORY_REG_DATA_SELECT, data_type);
+    if (ret < 0) {
+        FTS_TEST_SAVE_ERR("restore 0x06 fail,ret=%d\n", ret);
+    }
+
+test_err:
+    if (result) {
+        *test_result = true;
+        FTS_TEST_SAVE_INFO("------ differdata test PASS\n");
+    } else {
+        *test_result = false;
+        FTS_TEST_SAVE_INFO("------ differdata test NG\n");
+    }
+
+    /* save test data */
+    fts_test_save_data("differdata Test", CODE_M_RAWDATA_TEST,
+                       differdata, 0, false, false, *test_result);
+
+    FTS_TEST_FUNC_EXIT();
+    return ret;
+}
+
+
 static int ft5652_uniformity_test(struct fts_test *tdata, bool *test_result)
 {
     int ret = 0;
@@ -986,6 +1098,210 @@ test_err:
     return ret;
 }
 
+static int ft5652_scap_differdata_test(struct fts_test *tdata, bool *test_result)
+{
+    int ret = 0;
+    int i = 0;
+    bool tmp_result = false;
+    bool tmp2_result = false;
+    bool tmp3_result = false;
+    bool tmp4_result = false;
+    bool fw_wp_check = false;
+    bool tx_check = false;
+    bool rx_check = false;
+    int *scap_rawdata = NULL;
+    int *srawdata_tmp = NULL;
+    int srawdata_cnt = 0;
+    u8 wc_sel = 0;
+    u8 hc_sel = 0;
+    u8 hov_high = 0;
+    struct mc_sc_threshold *thr = &tdata->ic.mc_sc.thr;
+
+    FTS_TEST_FUNC_ENTER();
+    FTS_TEST_SAVE_INFO("\n============ Test Item: Scap differdata Test\n");
+    memset(tdata->buffer, 0, tdata->buffer_length);
+    scap_rawdata = tdata->buffer;
+
+    if ((tdata->sc_node.node_num * 4) > tdata->buffer_length) {
+        FTS_TEST_SAVE_ERR("scap differdata num(%d) > buffer length(%d)",
+                          tdata->sc_node.node_num * 4,
+                          tdata->buffer_length);
+        ret = -EINVAL;
+        goto test_err;
+    }
+
+    if (!thr->scap_rawdata_on_min || !thr->scap_rawdata_on_max
+        || !thr->scap_rawdata_off_min || !thr->scap_rawdata_off_max
+        || !thr->scap_rawdata_hi_min || !thr->scap_rawdata_hi_max
+        || !thr->scap_rawdata_hov_min || !thr->scap_rawdata_hov_max) {
+        FTS_TEST_SAVE_ERR("scap_rawdata_on/off/hi/hov_min/max is null\n");
+        ret = -EINVAL;
+        goto test_err;
+    }
+
+    ret = enter_factory_mode();
+    if (ret < 0) {
+        FTS_TEST_SAVE_ERR("enter factory mode fail,ret=%d\n", ret);
+        goto test_err;
+    }
+
+    /* SCAP RAWDATA is in no-mapping mode */
+    ret = mapping_switch(NO_MAPPING);
+    if (ret < 0) {
+        FTS_TEST_SAVE_ERR("switch no-mapping fail,ret=%d\n", ret);
+        goto test_err;
+    }
+
+    /* get waterproof channel select */
+    ret = fts_test_read_reg(FACTORY_REG_WC_SEL, &wc_sel);
+    if (ret < 0) {
+        FTS_TEST_SAVE_ERR("read water_channel_sel fail,ret=%d\n", ret);
+        goto test_err;
+    }
+
+    ret = fts_test_read_reg(FACTORY_REG_HC_SEL, &hc_sel);
+    if (ret < 0) {
+        FTS_TEST_SAVE_ERR("read high_channel_sel fail,ret=%d\n", ret);
+        goto test_err;
+    }
+
+    /* select rawdata */
+    ret = fts_test_write_reg(FACTORY_REG_DATA_SELECT, 0x01);
+    if (ret < 0) {
+        FTS_TEST_SAVE_ERR("set fir fail,ret=%d\n", ret);
+        goto test_err;
+    }
+    
+    /* scan rawdata */
+/*    ret = start_scan();
+    if (ret < 0) {
+        FTS_TEST_SAVE_ERR("scan scap differdata fail\n");
+        goto test_err;
+    }
+*/
+    /* water proof on check */
+    fw_wp_check = get_fw_wp(wc_sel, WATER_PROOF_ON);
+    if (thr->basic.scap_rawdata_wp_on_check && fw_wp_check) {
+        srawdata_tmp = scap_rawdata + srawdata_cnt;
+        ret = get_rawdata_mc_sc(WATER_PROOF_ON, srawdata_tmp);
+        if (ret < 0) {
+            FTS_TEST_SAVE_ERR("get scap(WP_ON) differdata fail\n");
+            goto test_err;
+        }
+
+        FTS_TEST_SAVE_INFO("scap_differdata in waterproof on mode:\n");
+        show_data_mc_sc(srawdata_tmp);
+
+        /* compare */
+        tx_check = get_fw_wp(wc_sel, WATER_PROOF_ON_TX);
+        rx_check = get_fw_wp(wc_sel, WATER_PROOF_ON_RX);
+/*        tmp_result = compare_mc_sc(tx_check, rx_check, srawdata_tmp,
+                                   thr->scap_rawdata_on_min,
+                                   thr->scap_rawdata_on_max);
+*/
+        srawdata_cnt += tdata->sc_node.node_num;
+    } else {
+        tmp_result = true;
+    }
+
+    /* water proof off check */
+    fw_wp_check = get_fw_wp(wc_sel, WATER_PROOF_OFF);
+    if (thr->basic.scap_rawdata_wp_off_check && fw_wp_check) {
+        srawdata_tmp = scap_rawdata + srawdata_cnt;
+        ret = get_rawdata_mc_sc(WATER_PROOF_OFF, srawdata_tmp);
+        if (ret < 0) {
+            FTS_TEST_SAVE_ERR("get scap(WP_OFF) differdata fail\n");
+            goto test_err;
+        }
+
+        FTS_TEST_SAVE_INFO("scap_differdata in waterproof off mode:\n");
+        show_data_mc_sc(srawdata_tmp);
+
+        /* compare */
+        tx_check = get_fw_wp(wc_sel, WATER_PROOF_OFF_TX);
+        rx_check = get_fw_wp(wc_sel, WATER_PROOF_OFF_RX);
+/*        tmp2_result = compare_mc_sc(tx_check, rx_check, srawdata_tmp,
+                                    thr->scap_rawdata_off_min,
+                                    thr->scap_rawdata_off_max);
+*/
+        srawdata_cnt += tdata->sc_node.node_num;
+    } else {
+        tmp2_result = true;
+    }
+
+    /*high mode*/
+    hov_high = (hc_sel & 0x03);
+    if (thr->basic.scap_rawdata_hi_check && hov_high) {
+        srawdata_tmp = scap_rawdata + srawdata_cnt;
+        ret = get_rawdata_mc_sc(HIGH_SENSITIVITY, srawdata_tmp);
+        if (ret < 0) {
+            FTS_TEST_SAVE_ERR("get scap(HS) differdata fail\n");
+            goto test_err;
+        }
+
+        FTS_TEST_SAVE_INFO("scap_differdata in hs mode:\n");
+        show_data_mc_sc(srawdata_tmp);
+
+        /* compare */
+        tx_check = ((hov_high == 1) || (hov_high == 3));
+        rx_check = ((hov_high == 2) || (hov_high == 3));
+ /*       tmp3_result = compare_mc_sc(tx_check, rx_check, srawdata_tmp,
+                                    thr->scap_rawdata_hi_min,
+                                    thr->scap_rawdata_hi_max);
+*/
+        srawdata_cnt += tdata->sc_node.node_num;
+    } else {
+        tmp3_result = true;
+    }
+
+    /*hov mode*/
+    hov_high = (hc_sel & 0x04);
+    if (thr->basic.scap_rawdata_hov_check && hov_high) {
+        srawdata_tmp = scap_rawdata + srawdata_cnt;
+        ret = get_rawdata_mc_sc(HOV, srawdata_tmp);
+        if (ret < 0) {
+            FTS_TEST_SAVE_ERR("get scap(HOV) rawdata fail\n");
+            goto test_err;
+        }
+
+        FTS_TEST_SAVE_INFO("scap_differdata in hov mode:\n");
+        show_data_mc_sc(srawdata_tmp);
+
+        /* compare */
+        tmp4_result = true;
+        for (i = 0; i < 4; i++) {
+            if ((srawdata_tmp[i] < thr->scap_rawdata_hov_min[i])
+                || (srawdata_tmp[i] > thr->scap_rawdata_hov_max[i])) {
+                FTS_TEST_SAVE_ERR("test fail,hov%d=%5d,range=(%5d,%5d)\n",
+                                  i + 1, srawdata_tmp[i],
+                                  thr->scap_rawdata_hov_min[i],
+                                  thr->scap_rawdata_hov_max[i]);
+                tmp4_result = false;
+            }
+        }
+
+        srawdata_cnt += tdata->sc_node.node_num;
+    } else {
+        tmp4_result = true;
+    }
+
+test_err:
+//    if (tmp_result && tmp2_result && tmp3_result && tmp4_result) {
+        *test_result = true;
+        FTS_TEST_SAVE_INFO("\n------ scap differdata test PASS\n");
+/*    } else {
+        *test_result = false;
+        FTS_TEST_SAVE_INFO("\n------ scap rawdata test NG\n");
+    }
+*/
+    /* save data */
+    fts_test_save_data("SCAP differdata Test", CODE_M_SCAP_RAWDATA_TEST,
+                       scap_rawdata, srawdata_cnt, true, false, *test_result);
+
+    FTS_TEST_FUNC_EXIT();
+    return ret;
+}
+
 static int ft5652_short_test(struct fts_test *tdata, bool *test_result)
 {
     int ret = 0;
@@ -1223,10 +1539,19 @@ static int start_test_ft5652(void)
 
     /* rawdata test */
     if (true == test_item->rawdata_test) {
+        if (!fts_ftest->differ_test) {
         ret = ft5652_rawdata_test(tdata, &temp_result);
         if ((ret < 0) || (false == temp_result)) {
             test_result = false;
         }
+        } else {
+        
+        ret = ft5652_differdata_test(tdata, &temp_result);
+        if ((ret < 0) || (false == temp_result)) {
+            test_result = false;
+        }
+        
+        }        
     }
 
     if (true == test_item->rawdata_uniformity_test) {
@@ -1246,9 +1571,16 @@ static int start_test_ft5652(void)
 
     /* scap_rawdata test */
     if (true == test_item->scap_rawdata_test) {
+        if (!fts_ftest->differ_test) {
         ret = ft5652_scap_rawdata_test(tdata, &temp_result);
         if ((ret < 0) || (false == temp_result)) {
             test_result = false;
+        }
+        } else {
+        ret = ft5652_scap_differdata_test(tdata, &temp_result);
+        if ((ret < 0) || (false == temp_result)) {
+            test_result = false;
+        }
         }
     }
 

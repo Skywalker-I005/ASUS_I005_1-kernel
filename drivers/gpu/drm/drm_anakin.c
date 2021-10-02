@@ -15,19 +15,6 @@ int fod_spot_ui_ready;
 int fod_gesture_touched;
 extern struct class *drm_class;
 extern struct kobject* asus_class_get_kobj(struct class *cls);
-char *temp_var_name;
-
-// for FOD fail rate use delay work queue replace msleep(34)
-static void drm_delay_work(struct work_struct *ignored)
-{
-	sysfs_notify(asus_class_get_kobj(drm_class), NULL, temp_var_name);
-}
-static DECLARE_DELAYED_WORK(dwork, drm_delay_work);
-
-static void drm_set_delay_work(void)
-{
-	schedule_delayed_work(&dwork, 17);
-}
 
 static ssize_t hdr_mode_show(struct class *class,
 					struct class_attribute *attr,
@@ -87,13 +74,7 @@ void anakin_drm_notify(int var, int value)
 	} else {
 		pr_err("[Display] update variable type %d from %d to %d\n", var, *selected_var, value);
 		*selected_var = value;
-		if ((var == ASUS_NOTIFY_SPOT_READY) && (value == 1)) {
-			//mdelay(34);
-			temp_var_name = selected_var_name;
-			drm_set_delay_work();
-		}
-		else
-			sysfs_notify(asus_class_get_kobj(drm_class), NULL, selected_var_name);
+		sysfs_notify(asus_class_get_kobj(drm_class), NULL, selected_var_name);
 	}
 }
 EXPORT_SYMBOL(anakin_drm_notify);
