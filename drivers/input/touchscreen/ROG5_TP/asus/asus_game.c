@@ -61,7 +61,8 @@ void reconfig_game_reg(bool reconfig) {
 	msleep(5);
 	fts_read_reg(FTS_REG_SLIDING_SENSITIVITY, &value);
 	if (value == slidling_sen){
-//	    FTS_DEBUG("set FTS_REG_SLIDING_SENSITIVITY 0x%x success",slidling_sen);
+	    if (fts_data->log_level >= 2)
+		FTS_DEBUG("set FTS_REG_SLIDING_SENSITIVITY 0x%x success",slidling_sen);
 	    break;
 	} else {
 	    FTS_DEBUG("set FTS_REG_SLIDING_SENSITIVITY 0x%x failed,retry count %d",value, i);
@@ -74,7 +75,8 @@ void reconfig_game_reg(bool reconfig) {
 	msleep(5);
 	fts_read_reg(FTS_REG_SLIDING_PRECISION, &value);
 	if (value == sliding_acy){
-//	    FTS_DEBUG("set FTS_REG_SLIDING_PRECISION 0x%x success",sliding_acy);
+	    if (fts_data->log_level >= 2)
+		FTS_DEBUG("set FTS_REG_SLIDING_PRECISION 0x%x success",sliding_acy);
 	    break;
 	} else {
 	    FTS_DEBUG("set FTS_REG_SLIDING_PRECISION 0x%x failed,retry count %d",value, i);
@@ -87,7 +89,8 @@ void reconfig_game_reg(bool reconfig) {
 	msleep(5);
 	fts_read_reg(FTS_REG_TOUCH_SENSITIVITY, &value);
 	if (value == touch_acy){
-//	    FTS_DEBUG("set FTS_REG_TOUCH_SENSITIVITY 0x%x success",touch_acy);
+	    if (fts_data->log_level >= 2)
+		FTS_DEBUG("set FTS_REG_TOUCH_SENSITIVITY 0x%x success",touch_acy);
 	    break;
 	} else {
 	    FTS_DEBUG("set FTS_REG_TOUCH_SENSITIVITY 0x%x failed,retry count %d",value, i);
@@ -106,7 +109,7 @@ void set_rotation_mode()
     
 // rotation to 0    
     if (ts_data->rotation_angle == ANGLE_0) {
-      FTS_INFO("Rotation angle 0");
+      FTS_DEBUG("Rotation angle 0");
       ret = fts_write_reg(FTS_REG_EDGEPALM_MODE_EN, 0x00);
       msleep(5);
       fts_read_reg(FTS_REG_EDGEPALM_MODE_EN, &mode);
@@ -116,7 +119,7 @@ void set_rotation_mode()
     }
 // rotation to 90
     if (ts_data->rotation_angle == ANGLE_90) {
-      FTS_INFO("Rotation angle 90");
+      FTS_DEBUG("Rotation angle 90");
       ret = fts_write_reg(FTS_REG_EDGEPALM_MODE_EN, 0x01);
       msleep(5);
       fts_read_reg(FTS_REG_EDGEPALM_MODE_EN, &mode);
@@ -127,7 +130,7 @@ void set_rotation_mode()
 
 // rotation to 270
     if (ts_data->rotation_angle == ANGLE_270) {
-      FTS_INFO("Rotation angle 270");
+      FTS_DEBUG("Rotation angle 270");
       ret = fts_write_reg(FTS_REG_EDGEPALM_MODE_EN, 0x02);
       msleep(5);
       fts_read_reg(FTS_REG_EDGEPALM_MODE_EN, &mode);
@@ -226,9 +229,10 @@ void set_edge_palm() {
     
     if ((l_set != l_val) || (r_set!= r_val)) {
         FTS_INFO("Set edge palm error set (L:%x, R:%x), read (L:%x, R:%x)",l_set,r_set,l_val,r_val);
-    } else
-	FTS_INFO("game mode: %d Set rotation reg to %d , palm range left %x right %x",ts_data->game_mode,ts_data->rotation_angle,l_val,r_val);	  
-    
+    } else {
+        if (fts_data->log_level >= 2)
+	    FTS_INFO("game mode: %d Set rotation reg to %d , palm range left %x right %x",ts_data->game_mode,ts_data->rotation_angle,l_val,r_val);	  
+    }
     wait_resume = false;
 }
 
@@ -237,6 +241,10 @@ void set_report_rate () {
     int ret = 0 , i = 0;
     u8 rate = 0;
     
+    if (fts_data->report_rate != REPORT_RATE_2) {
+	ret = fts_write_reg(FTS_REG_REPORT_RATE_BURST, 0x00);
+    }
+    
     if (fts_data->report_rate == REPORT_RATE_0) {
 	mutex_lock(&fts_data->reg_lock);      
 	for (i = 0; i < 6; i++) {
@@ -244,11 +252,12 @@ void set_report_rate () {
 	    msleep(20);
 	    ret = fts_read_reg(FTS_REG_REPORT_RATE, &rate);
 	    if (rate!=0x00){
-	      FTS_DEBUG("set report rate to 120Hz fail rate 0x%X , retry %d",rate, i);
+	      FTS_DEBUG("set report rate to min fail rate 0x%X , retry %d",rate, i);
 	      msleep(20);
 	    } else {
       	      ts_data->report_rate = REPORT_RATE_0;
-	      FTS_DEBUG("set report rate to 120Hz rate %X",rate);
+	      if (fts_data->log_level >= 2)
+		  FTS_DEBUG("set report rate to min rate %X",rate);
 	      break;
 	    }
 	}
@@ -259,15 +268,16 @@ void set_report_rate () {
     if (fts_data->report_rate == REPORT_RATE_1) {
 	mutex_lock(&fts_data->reg_lock);      
 	for (i = 0; i < 6; i++) {
-	    ret = fts_write_reg(FTS_REG_REPORT_RATE, 0x1C);
+	    ret = fts_write_reg(FTS_REG_REPORT_RATE, 0x24);
 	    msleep(20);
 	    ret = fts_read_reg(FTS_REG_REPORT_RATE, &rate);
-	    if (rate!=0x1C){
-	      FTS_DEBUG("set report rate to 300Hz fail rate 0x%X , retry %d",rate, i);
+	    if (rate!=0x24){
+	      FTS_DEBUG("set report rate to default fail rate 0x%X , retry %d",rate, i);
 	      msleep(20);
 	    } else {
       	      ts_data->report_rate = REPORT_RATE_1;
-	      FTS_DEBUG("set report rate to 300Hz rate %X",rate);
+	      if (fts_data->log_level >= 2)
+		  FTS_DEBUG("set report rate to default rate %X",rate);
 	      break;
 	    }
 	}
@@ -279,15 +289,16 @@ void set_report_rate () {
     if (fts_data->report_rate == REPORT_RATE_2) {
 	mutex_lock(&fts_data->reg_lock);      
 	for (i = 0; i < 6; i++) {
-	    ret = fts_write_reg(FTS_REG_REPORT_RATE_600, 0x01);
+	    ret = fts_write_reg(FTS_REG_REPORT_RATE_BURST, 0x01);
 	    msleep(20);
-	    ret = fts_read_reg(FTS_REG_REPORT_RATE_600, &rate);
+	    ret = fts_read_reg(FTS_REG_REPORT_RATE_BURST, &rate);
 	    if (rate!=0x01){
-	      FTS_DEBUG("set report rate to 560Hz fail rate 0x%X , retry %d",rate, i);
+	      FTS_DEBUG("set report rate to max fail rate 0x%X , retry %d",rate, i);
 	      msleep(20);
 	    } else {
       	      ts_data->report_rate = REPORT_RATE_2;
-	      FTS_DEBUG("set report rate to 560Hz rate %X",rate);
+	      if (fts_data->log_level >= 2)
+		  FTS_DEBUG("set report rate to max rate %X",rate);
 	      break;
 	    }
 	}
@@ -336,7 +347,7 @@ static ssize_t atr_buf_write(struct atr_queue *q, u8 id, u8 active, u16 x, u16 y
 		q->data[q->tail].atr_time = timestamp;
 		q->buf_size++;
 		spin_unlock(&q->buffer_lock);
-		FTS_INFO("[ATR_Q_W] ID %d active %d x %d y %d p %d m %d t %llu", q->data[q->tail].id, q->data[q->tail].active, q->data[q->tail].x, q->data[q->tail].y,  q->data[q->tail].p,  q->data[q->tail].m,q->data[q->tail].atr_time);
+//		FTS_INFO("[ATR_Q_W] ID %d active %d x %d y %d p %d m %d t %llu", q->data[q->tail].id, q->data[q->tail].active, q->data[q->tail].x, q->data[q->tail].y,  q->data[q->tail].p,  q->data[q->tail].m,q->data[q->tail].atr_time);
 		return 1;
 	}
 }
@@ -368,7 +379,7 @@ static ssize_t atr_buf_read(struct atr_queue *q, struct input_dev *input_dev,kti
 			q->head = (q->head + 1) % q->capacity;
 			q->buf_size--;
 			spin_unlock(&q->buffer_lock);
-			FTS_INFO("[ATR_Q_R] ID %d active %d x %d y %d p %d m %d time %llu", item->id, item->active, item->x, item->y, item->p, item->m,timestamp);
+//			FTS_INFO("[ATR_Q_R] ID %d active %d x %d y %d p %d m %d time %llu", item->id, item->active, item->x, item->y, item->p, item->m,timestamp);
 			
 			input_mt_slot(input_dev, item->id);
 			if (item->active == true) {
@@ -441,7 +452,7 @@ void ATR_touch(int id,int action, int x, int y, int random)
 	x= x*16;
 	y = y*16;
 	
-	FTS_INFO("keymapping ATR_touch  id=%d, action=%d, x=%d, y=%d", id, action,  x,  y);
+//	FTS_INFO("keymapping id=%d, action=%d, x=%d, y=%d", id, action,  x,  y);
 	mutex_lock(&input_dev->mutex);
 	if(action) //press, find first slot or find last slot;
 	{
@@ -452,13 +463,13 @@ void ATR_touch(int id,int action, int x, int y, int random)
 			if(touch_figer_slot[i] == (id + 1)) //if the last id has been pressed, keep reporting same slot
 				first_empty_slot = i;
 		}
-		FTS_INFO("keymapping ATR_touch press found slot %d", first_empty_slot);
+//		FTS_INFO("keymapping ATR_touch press found slot %d", first_empty_slot);
 		if(first_empty_slot != -1) // found an available slot
 		{
 			if(touch_figer_slot[first_empty_slot] ==0)
 				FTS_INFO("keymapping report %d down x=%d ,y=%d ",first_empty_slot,x,y);
-			
-			FTS_INFO("slot %d", first_empty_slot+10);
+			if (fts_data->log_level >= 2)
+			    FTS_INFO("slot %d", first_empty_slot+10);
 			input_mt_slot(input_dev, first_empty_slot + 10);
 			input_mt_report_slot_state(input_dev, MT_TOOL_FINGER, true);
 			if (fts_data->realtime == 1) { 
@@ -477,20 +488,20 @@ void ATR_touch(int id,int action, int x, int y, int random)
 				input_report_abs(input_dev, ABS_MT_TOUCH_MAJOR, 0x09 + random_major);
 				input_report_abs(input_dev, ABS_MT_POSITION_X, x );
 				input_report_abs(input_dev, ABS_MT_POSITION_Y, y );
-				FTS_INFO("[ATR_N_R] ID %d active %d x %d y %d p %d m %d", first_empty_slot + 10, action, x, y, 0x3f + random_pressure, 0x09 + random_major);
+//				FTS_INFO("[ATR_N_R] ID %d active %d x %d y %d p %d m %d", first_empty_slot + 10, action, x, y, 0x3f + random_pressure, 0x09 + random_major);
 			} else {
 				atr_buf_write(atr_buf_queue, first_empty_slot + 10, action, x, y, 0x3f + random_pressure, 0x09 + random_major,fts_data->atr_received);
 			}
 
 			if(!fts_data->finger_press) {
 			    if(first_continue_flag == false) {
-				FTS_INFO("no touch BTN down , atr touch down");
+//				FTS_INFO("no touch BTN down , atr touch down");
 				input_report_key(input_dev, BTN_TOUCH, 1);
 				if (random == 1)
 				    first_continue_flag = true;
 			    }
 			} else {
-				FTS_INFO("touch BTN down long pressed , ignore atr touch down");
+//				FTS_INFO("touch BTN down long pressed , ignore atr touch down");
 			}
 			if(!fts_data->finger_press)
 			    input_sync(input_dev);
@@ -517,7 +528,7 @@ void ATR_touch(int id,int action, int x, int y, int random)
 			if(!fts_data->finger_press) {
 				input_mt_slot(input_dev, first_empty_slot + 10);
 				input_mt_report_slot_state(input_dev, MT_TOOL_FINGER, false);
-				FTS_INFO("[ATR_N_R] ID %d active %d x %d y %d p %d m %d", first_empty_slot + 10, action, 0, 0, 0, 0);
+//				FTS_INFO("[ATR_N_R] ID %d active %d x %d y %d p %d m %d", first_empty_slot + 10, action, 0, 0, 0, 0);
 				input_sync(input_dev);
 			} else {
 				atr_buf_write(atr_buf_queue, first_empty_slot + 10, action, 0, 0, 0, 0,fts_data->atr_received);
@@ -539,7 +550,8 @@ void ATR_touch(int id,int action, int x, int y, int random)
 		}
 		if(!fts_data->finger_press)
 		{
-		    FTS_INFO("no touch and atr BTN down, all BTN up");
+		    if (fts_data->log_level >= 2)
+			FTS_INFO("no touch and atr BTN down, all BTN up");
 		    input_report_key(input_dev, BTN_TOUCH, 0);
 		    input_sync(input_dev);
 		}
@@ -571,7 +583,8 @@ static ssize_t keymapping_touch_store(struct device *dev,
 				      struct device_attribute *attr, const char *buf, size_t count)
 {
 	int id = 0, action = 0, x = 0, y = 0, random = 0, minus = 0;
-	FTS_INFO("keymapping cmd buf: %s len=%d", buf, count);
+	if (fts_data->log_level >= 2)
+	    FTS_INFO("keymapping cmd buf: %s len=%d", buf, count);
 	
 	if ((count > 16) || (count < 14)){
 	    FTS_INFO("Invalid cmd buffer %d", count);
@@ -610,8 +623,8 @@ static ssize_t keymapping_touch_store(struct device *dev,
 		if(minus == '-')
 			y = -y;
 	}
-	
-	FTS_INFO("keymapping ID=%d ACTION=%d X=%d Y=%d RANDOM=%d", id, action, x, y, random);
+	if (fts_data->log_level >= 2)
+	    FTS_INFO("keymapping ID=%d ACTION=%d X=%d Y=%d RANDOM=%d", id, action, x, y, random);
 	ATR_touch(id, action, x, y, random);
 
 	return count;
@@ -744,9 +757,9 @@ static ssize_t game_settings_store(
 	slidling_sen = (u16)shex_to_u16(game_settings +0, 3);
 	sliding_acy = (u16)shex_to_u16(game_settings +4, 3);
 	touch_acy = (u16)shex_to_u16(game_settings +8, 3);
-
-	FTS_INFO("slidling_sen 0x%03X, sliding_acy 0x%03X touch_acy 0x%03X",
-		slidling_sen,sliding_acy,touch_acy);
+	if (fts_data->log_level >= 2)
+	    FTS_INFO("slidling_sen 0x%03X, sliding_acy 0x%03X touch_acy 0x%03X", slidling_sen,sliding_acy,touch_acy);
+	
 	if (fts_data->suspended) {
 	    wait_resume = true;
 	    return count;
@@ -760,7 +773,8 @@ static ssize_t game_settings_store(
 		msleep(5);
 		fts_read_reg(FTS_REG_SLIDING_SENSITIVITY, &value);
 		if (value == slidling_sen){
-		    FTS_DEBUG("set FTS_REG_SLIDING_SENSITIVITY 0x%x success",slidling_sen);
+		    if (fts_data->log_level >= 2)
+			FTS_DEBUG("set FTS_REG_SLIDING_SENSITIVITY 0x%x success",slidling_sen);
 		    break;
 		} else {
 		    FTS_DEBUG("set FTS_REG_SLIDING_SENSITIVITY 0x%x failed,retry count %d",value, i);
@@ -773,7 +787,8 @@ static ssize_t game_settings_store(
 		msleep(5);
 		fts_read_reg(FTS_REG_SLIDING_PRECISION, &value);
 		if (value == sliding_acy){
-		    FTS_DEBUG("set FTS_REG_SLIDING_PRECISION 0x%x success",sliding_acy);
+		    if (fts_data->log_level >= 2)
+			FTS_DEBUG("set FTS_REG_SLIDING_PRECISION 0x%x success",sliding_acy);
 		    break;
 		} else {
 		    FTS_DEBUG("set FTS_REG_SLIDING_PRECISION 0x%x failed,retry count %d",value, i);
@@ -786,7 +801,8 @@ static ssize_t game_settings_store(
 		msleep(5);
 		fts_read_reg(FTS_REG_TOUCH_SENSITIVITY, &value);
 		if (value == touch_acy){
-		    FTS_DEBUG("set FTS_REG_TOUCH_SENSITIVITY 0x%x success",touch_acy);
+		    if (fts_data->log_level >= 2)
+	    		FTS_DEBUG("set FTS_REG_TOUCH_SENSITIVITY 0x%x success",touch_acy);
 		    break;
 		} else {
 		    FTS_DEBUG("set FTS_REG_TOUCH_SENSITIVITY 0x%x failed,retry count %d",value, i);
@@ -807,7 +823,7 @@ static ssize_t rise_report_rate_show (struct device *dev, struct device_attribut
     int report_rate = 0;
     fts_read_reg(FTS_REG_REPORT_RATE, &rate);
     
-    if (rate == 0x1c)
+    if (rate == 0x24)
         report_rate = 300;
     else
         report_rate = 120;
@@ -834,7 +850,7 @@ static ssize_t rise_report_rate_store(
 	  fts_data->power_saving_mode = true;
 	} else if (buf[0] == '1') {
   	  if (fts_data->pre_report_rate != 1)
-	      reconfig = true;	  
+	      reconfig = true;  
 	  fts_data->report_rate = REPORT_RATE_1; //300Hz
 	  fts_data->power_saving_mode = false;
 	  fts_data->pre_report_rate =1;
@@ -848,8 +864,8 @@ static ssize_t rise_report_rate_store(
   
     if (reconfig)  
         set_report_rate();
-
-    FTS_DEBUG("Report rate set to:%d", fts_data->report_rate);
+    if (fts_data->log_level >= 2)
+	FTS_DEBUG("Report rate set to:%d", fts_data->report_rate);
     return count;
 }
 
@@ -881,10 +897,14 @@ static ssize_t edge_settings_store(
             return -EINVAL;
 	}
 	
+	if (fts_data->suspended) {
+	    return count;
+	}
+	
 	Rcoefleft = (u16)shex_to_u16(edge_settings +0, 3);
 	RcoefRight = (u16)shex_to_u16(edge_settings +4, 3);
-	
-	FTS_INFO("Rcoefleft 0x%X,RcoefRight 0x%X",Rcoefleft,RcoefRight);
+	if (fts_data->log_level >= 2)
+	    FTS_INFO("Rcoefleft 0x%X,RcoefRight 0x%X",Rcoefleft,RcoefRight);
 	if (!fts_data->suspended) {
 	    if (Rcoefleft > 10 || RcoefRight > 10) {
 		fts_data->edge_palm_enable = 0;
@@ -934,20 +954,17 @@ void asus_game_recovery(struct fts_ts_data *ts_data)
 	set_edge_palm();
       }
     }
-    
-    reconfig_game_reg(true);
+   
+    if ((slidling_sen == 0x3)&& (sliding_acy == 0x3)&& (touch_acy == 0x3)) {
+//      FTS_INFO("game reg is default ");
+    } else {
+	reconfig_game_reg(true);
+    }
 }
 
 void report_rate_recovery(struct fts_ts_data *ts_data) 
 {
-    FTS_INFO("reconfig with report rate %d",fts_data->report_rate);
-    if ((fts_data->report_rate == REPORT_RATE_0)||(fts_data->report_rate == REPORT_RATE_1)) 
-        set_report_rate();
-    
-    if (fts_data->report_rate == REPORT_RATE_2) {
-        fts_data->report_rate = REPORT_RATE_1;
-        set_report_rate();
-	fts_data->report_rate = REPORT_RATE_2;
+    if (fts_data->report_rate != REPORT_RATE_1) {
 	set_report_rate();
     }
 }

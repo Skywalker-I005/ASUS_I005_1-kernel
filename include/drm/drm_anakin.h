@@ -5,6 +5,9 @@
 #define _DRM_ANAKIN_H_
 
 #if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT
+#include <linux/module.h>
+#include <linux/kernel.h>
+#include <linux/workqueue.h>
 #define ASUS_NOTIFY_GHBM_ON_REQ        0
 #define ASUS_NOTIFY_GHBM_ON_READY      1
 #define ASUS_NOTIFY_SPOT_READY         2

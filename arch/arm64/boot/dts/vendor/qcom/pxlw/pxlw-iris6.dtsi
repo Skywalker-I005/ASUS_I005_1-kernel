@@ -129,6 +129,10 @@
 		};
 
 		timing@2{
+			pxlw,iris-lightup-config = <&mdss_iris_cfg_ams678_fhd_plus_dsc_90hz_cmd>;
+		};
+
+		timing@3{
 			pxlw,iris-lightup-config = <&mdss_iris_cfg_ams678_fhd_plus_dsc_60hz_cmd>;
 		};
 

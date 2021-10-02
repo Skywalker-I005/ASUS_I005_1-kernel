@@ -48,6 +48,7 @@
 //#include <linux/wakelock.h>
 #include "gf_spi.h"
 #include "gf_wakelock.h"
+#include <drm/drm_panel.h>
 
 #if defined(USE_SPI_BUS)
 #include <linux/spi/spi.h>
@@ -610,9 +611,12 @@ static int goodix_fb_state_chg_callback(struct notifier_block *nb,
 	unsigned int blank = 0;
 	char msg = 0;
 
-	if (val != FB_EARLY_EVENT_BLANK)
+	if (!((val == DRM_PANEL_EARLY_EVENT_BLANK) || (val == DRM_PANEL_EVENT_BLANK))) {
+		pr_err("[GF] event(%lu) do not need process", val);
 		return 0;
-	pr_info("[info] %s go to the goodix_fb_state_chg_callback value = %d\n",
+	}
+
+	pr_err("[GF] %s go to the goodix_fb_state_chg_callback value = %d\n",
 			__func__, (int)val);
 	gf_dev = container_of(nb, struct gf_dev, notifier);
 	if (evdata && evdata->data && val == FB_EARLY_EVENT_BLANK && gf_dev) {
@@ -643,16 +647,67 @@ static int goodix_fb_state_chg_callback(struct notifier_block *nb,
 			}
 			break;
 		default:
-			pr_info("%s defalut\n", __func__);
+			pr_info("[GF] %s defalut\n", __func__);
 			break;
 		}
 	}
 	return NOTIFY_OK;
 }
 
-static struct notifier_block goodix_noti_block = {
-	.notifier_call = goodix_fb_state_chg_callback,
-};
+static struct notifier_block goodix_noti_block;
+static struct drm_panel *active_panel;
+static int drm_check_dt(struct device_node *np)
+{
+    int i = 0;
+    int count = 0;
+    struct device_node *node = NULL;
+    struct drm_panel *panel = NULL;
+
+    count = of_count_phandle_with_args(np, "panel", NULL);
+    if (count <= 0) {
+        pr_err("find drm_panel count(%d) fail", count);
+        return -ENODEV;
+    }
+
+    for (i = 0; i < count; i++) {
+        node = of_parse_phandle(np, "panel", i);
+        panel = of_drm_find_panel(node);
+        of_node_put(node);
+        if (!IS_ERR(panel)) {
+            pr_err("find drm_panel successfully");
+            active_panel = panel;
+            return 0;
+        }
+    }
+
+    pr_err("no find drm_panel");
+
+    return -ENODEV;
+}
+
+void gf_register_drm_callback(struct gf_dev *gf_dev)
+{
+	struct device *dev = &gf_dev->spi->dev;
+	struct device_node *np = dev->of_node;
+	int ret = 0;
+
+	pr_err("[GF] RegisterDRMCallback");
+	ret = drm_check_dt(np);
+	if (ret) {
+		pr_err("[GF] parse drm-panel fail");
+	}
+
+	goodix_noti_block.notifier_call = goodix_fb_state_chg_callback;
+
+	if (active_panel) {
+		pr_err("[GF] RegisterDRMCallback: registering fb notification");
+		ret = drm_panel_notifier_register(active_panel, &goodix_noti_block);
+		if (ret)
+			pr_err("[GF] drm_panel_notifier_register fail: %d", ret);
+	}
+
+	return;
+}
 
 static struct class *gf_class;
 #if defined(USE_SPI_BUS)
@@ -740,16 +795,15 @@ static int gf_probe(struct platform_device *pdev)
 	spi_clock_set(gf_dev, 1000000);
 #endif
 
-	printk("[GDX_FP] gf_power_on: set FP_3V0_EN +++\n");
+	printk("[GF] gf_power_on: set FP_3V0_EN +++\n");
 	if (gf_power_on(gf_dev) < 0) {
-		printk("[GDX_FP] opps gf_power_on fail! \n");
+		printk("[GF] opps gf_power_on fail! \n");
 		status = -4;
 		goto error_hw;
 	}
-	printk("[GDX_FP] gf_power_on: set FP_3V0_EN ---\n"); 
+	printk("[GF] gf_power_on: set FP_3V0_EN ---\n");
 
-	gf_dev->notifier = goodix_noti_block;
-	fb_register_client(&gf_dev->notifier);
+	gf_register_drm_callback(gf_dev);
 
 	gf_dev->irq = gf_irq_num(gf_dev);
 

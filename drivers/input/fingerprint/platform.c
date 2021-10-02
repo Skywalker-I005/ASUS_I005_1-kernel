@@ -47,15 +47,15 @@ int gf_parse_dts(struct gf_dev *gf_dev)
 // ASUS BSP Pin Ctrl +++
 	fp_pc = devm_pinctrl_get(&gf_dev->spi->dev);
 	if (IS_ERR_OR_NULL(fp_pc)) {
-		pr_err("[FP] failed to get fp pinctrl\n");
+		pr_err("[GF] failed to get fp pinctrl\n");
 	}
 	fp_pcs = pinctrl_lookup_state(fp_pc, "fp_default");
 	if (IS_ERR_OR_NULL(fp_pcs)) {
-		pr_err("[FP] failed to get fp pinctrl state from dtsi\n");
+		pr_err("[GF] failed to get fp pinctrl state from dtsi\n");
 	}
 	rc = pinctrl_select_state(fp_pc, fp_pcs);
 	if (rc < 0) {
-		pr_err("[FP] failed to set fp pinctrl state\n");
+		pr_err("[GF] failed to set fp pinctrl state\n");
 	}
 // ASUS BSP Pin Ctrl ---
 

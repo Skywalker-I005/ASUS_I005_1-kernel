@@ -192,6 +192,11 @@ struct oem_set_ASUS_media_req {
 	u8    asus_media;
 };
 
+struct oem_set_Shutdown_mode_req {
+	struct pmic_glink_hdr	hdr;
+	u8    shutdown_mode;
+};
+
 struct oem_set_hwid_to_ADSP_req {
 	struct pmic_glink_hdr	hdr;
 	u32    hwid_val;
@@ -308,6 +313,7 @@ extern int asus_extcon_set_state_sync(struct extcon_dev *edev, int cable_state);
 #define OEM_GET_FG_SoC_REQ			0x3003
 #define OEM_SET_ASUS_media			0x3104
 #define OEM_GET_Cell_Voltage_REQ	0x3005
+#define OEM_SET_Shutdown_mode       0x3106
 //Define Message Type
 #define MSG_TYPE_REQ_RESP	1
 #define MSG_TYPE_NOTIFICATION	2
@@ -353,6 +359,8 @@ int g_SWITCH_LEVEL = SWITCH_LEVEL0_DEFAULT;
 struct delayed_work	asus_set_qc_state_work;
 #define Side_Port_Not_Asus_VID_or_No_charger 102
 #define Side_Port_Asus_VID 103
+#define Bottom_Port_Not_Asus_VID_or_No_charger 100
+#define Bottom_Port_Asus_VID 101
 bool g_ADAPTER_ID = 0;
 extern bool g_Charger_mode;
 bool g_IsBootComplete = 0;
@@ -388,6 +396,7 @@ bool g_wifi_hs_en = false;//add to printk the WIFI hotspot & QXDM UTS event
 bool feature_stop_chg_flag = false;
 //bool bFactoryChgLimit = false;
 struct wake_lock cable_resume_wake_lock;
+struct wake_lock cos_wa_wake_lock;
 //[---] Add the global variables
 
 //[+++] Add the PDO of source for RT1715
@@ -407,6 +416,8 @@ void asus_update_thermal_result(void);
 extern int battery_chg_write(struct battery_chg_dev *bcdev, void *data, int len);
 extern int rt_chg_get_during_swap(void);
 extern bool rt_chg_check_asus_vid(void);
+extern void qti_charge_notify_device_charge(void);
+extern void qti_charge_notify_device_not_charge(void);
 
 #if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT
 typedef void(*dwc3_role_switch_fn)(bool);
@@ -1350,6 +1361,40 @@ static ssize_t enter_ship_mode_show(struct class *c,
 }
 static CLASS_ATTR_RW(enter_ship_mode);
 
+static ssize_t set_shutdown_mode_store(struct class *c,
+					struct class_attribute *attr,
+					const char *buf, size_t count)
+{
+	struct oem_set_Shutdown_mode_req msg = { { 0 } };
+
+	int rc, tmp;
+	bool shutdown_en;
+	tmp = simple_strtol(buf, NULL, 10);
+	shutdown_en = tmp;
+	if (shutdown_en == 0) {
+		CHG_DBG("%s. NO action for shutdown mode\n", __func__);
+		return count;
+	}
+	msg.hdr.owner = PMIC_GLINK_MSG_OWNER_OEM;
+	msg.hdr.type = MSG_TYPE_REQ_RESP;
+	msg.hdr.opcode = OEM_SET_Shutdown_mode;
+	msg.shutdown_mode = 1;
+
+	rc = battery_chg_write(g_bcdev, &msg, sizeof(msg));
+	if (rc < 0)
+		pr_err("%s. Failed to write shutdown mode: %d\n", rc);
+	CHG_DBG("%s. Set shutdown Mode OK\n", __func__);
+
+	return count;
+}
+
+static ssize_t set_shutdown_mode_show(struct class *c,
+					struct class_attribute *attr, char *buf)
+{
+    return scnprintf(buf, PAGE_SIZE, "No function\n");
+}
+static CLASS_ATTR_RW(set_shutdown_mode);
+
 
 static ssize_t set_debugmask_store(struct class *c,
 					struct class_attribute *attr,
@@ -1697,14 +1742,18 @@ static ssize_t boot_completed_store(struct class *c,
 					const char *buf, size_t count)
 {
 	int tmp = 0;
+	bool btm_vid = 0;
 
 	tmp = simple_strtol(buf, NULL, 10);
+	btm_vid = rt_chg_check_asus_vid();
 
 	g_IsBootComplete = tmp;
-	CHG_DBG("%s: g_IsBootComplete : %d, g_ADAPTER_ID : %d\n", __func__, g_IsBootComplete, g_ADAPTER_ID);
+	CHG_DBG("%s: g_IsBootComplete : %d, g_ADAPTER_ID : %d btm_vid : %d\n", __func__, g_IsBootComplete, g_ADAPTER_ID, btm_vid);
 	msleep(10);
 	if (g_ADAPTER_ID == true)
 		asus_extcon_set_state_sync(quickchg_extcon, Side_Port_Asus_VID);
+	else if (btm_vid == true)
+		asus_extcon_set_state_sync(quickchg_extcon, Bottom_Port_Asus_VID);
 
 	return count;
 }
@@ -1736,6 +1785,7 @@ static struct attribute *asuslib_class_attrs[] = {
 	&class_attr_once_usb_thermal_side.attr,
 	&class_attr_once_usb_thermal_btm.attr,
 	&class_attr_enter_ship_mode.attr,
+	&class_attr_set_shutdown_mode.attr,
 	&class_attr_charger_limit_mode.attr,
 	&class_attr_set_debugmask.attr,
 	&class_attr_set_i_limit.attr,
@@ -1981,6 +2031,7 @@ static void handle_message(struct battery_chg_dev *bcdev, void *data,
 	struct oem_get_cell_voltage_resp *cell_voltage_msg;
 	struct oem_set_ASUS_media_req *set_asus_media_msg;
 	struct oem_get_cc_status_msg *get_cc_status_msg;
+	struct oem_set_Shutdown_mode_req *set_shutdown_mode_msg;
 
 	switch (hdr->opcode) {
 	case OEM_GET_ADSP_PLATFORM_ID:
@@ -2037,7 +2088,7 @@ static void handle_message(struct battery_chg_dev *bcdev, void *data,
 			ChgPD_Info.fg_real_soc = fg_soc_msg->fg_soc;
 			ack_set = true;
 		} else {
-			pr_err("Incorrect response length %zu for asus_batt_temp\n",
+			pr_err("Incorrect response length %zu for OEM_GET_FG_SoC_REQ\n",
 				len);
 		}
 		break;
@@ -2057,7 +2108,16 @@ static void handle_message(struct battery_chg_dev *bcdev, void *data,
 			CHG_DBG("%s OEM_SET_ASUS_media successfully\n", __func__);
 			ack_set = true;
 		} else {
-			pr_err("Incorrect response length %zu for OEM_SET_CHG_LIMIT\n",
+			pr_err("Incorrect response length %zu for OEM_SET_ASUS_media\n",
+				len);
+		}
+		break;
+	case OEM_SET_Shutdown_mode:
+		if (len == sizeof(*set_shutdown_mode_msg)) {
+			CHG_DBG("%s OEM_SET_Shutdown_mode successfully\n", __func__);
+			ack_set = true;
+		} else {
+			pr_err("Incorrect response length %zu for OEM_SET_Shutdown_mode\n",
 				len);
 		}
 		break;
@@ -2068,6 +2128,10 @@ static void handle_message(struct battery_chg_dev *bcdev, void *data,
 			ack_set = true;
 			g_vbus_plug = vbus_src_msg->vbus_src;
 			CHG_DBG("%s g_vbus_plug = %d\n", __func__, g_vbus_plug);
+			if (g_vbus_plug == 1)
+				qti_charge_notify_device_charge();
+			else
+				qti_charge_notify_device_not_charge();
 		} else {
 			pr_err("Incorrect response length %zu for get VBUS_SRC\n",
 				len);
@@ -2343,11 +2407,13 @@ int asus_set_vbus_attached_status(int value) {
 	if (value) {
 		g_vbus_plug = 1;
 		ASUSEvtlog("[BAT][Ser]Cable Plug-in");
+		qti_charge_notify_device_charge();
 		schedule_delayed_work(&asus_min_check_work, 0);
 		schedule_delayed_work(&asus_18W_workaround_work, msecs_to_jiffies(10000));
 	} else {
 		g_vbus_plug = 0;
 		ASUSEvtlog("[BAT][Ser]Cable Plug-out");
+		qti_charge_notify_device_not_charge();
 		//[+++]Reset the parameter for limiting the charging
 		feature_stop_chg_flag = false;
 		//bFactoryChgLimit = false;
@@ -3252,7 +3318,12 @@ int asuslib_init(void) {
     //PASS_HWID_TO_ADSP();
 
 	wake_lock_init(&cable_resume_wake_lock, g_bcdev->dev, "cable_resume_wake_lock");
-
+	if (g_Charger_mode) {
+		//In post-cs10, something blocks the device in the beginning.
+		//and it will be late to detect cable-out, so make a wakelock to avoid this duration.
+		wake_lock_init(&cos_wa_wake_lock, g_bcdev->dev, "cos_wa_wake_lock");
+		wake_lock_timeout(&cos_wa_wake_lock, msecs_to_jiffies(90000));
+	}
 	//register drm notifier
 	INIT_DELAYED_WORK(&asus_set_panelonoff_current_work, asus_set_panelonoff_current_worker);
 	RegisterDRMCallback();
@@ -3283,6 +3354,8 @@ int asuslib_deinit(void) {
 	//int rc;
 
 	wake_lock_destroy(&cable_resume_wake_lock);
+	if (g_Charger_mode)
+		wake_lock_destroy(&cos_wa_wake_lock);
 	class_unregister(&asuslib_class);
 	return 0;
 }

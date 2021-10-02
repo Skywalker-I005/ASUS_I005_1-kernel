@@ -671,12 +671,16 @@ static void battery_chg_update_usb_type_work(struct work_struct *work)
 	}
 
 	pr_debug("usb_adap_type: %u\n", pst->prop[USB_ADAP_TYPE]);
-        
+
+	//[+++]ASUS_BSP : Move this notification to asus_battery_charger.c
+	#if 0
 	if (pst->prop[USB_ONLINE]) {
 	    qti_charge_notify_device_charge();
 	} else if (!pst->prop[USB_ONLINE]) {
 	    qti_charge_notify_device_not_charge();
 	}
+	#endif
+	//[---]ASUS_BSP : Move this notification to asus_battery_charger.c
 	
 	switch (pst->prop[USB_ADAP_TYPE]) {
 	case POWER_SUPPLY_USB_TYPE_SDP:

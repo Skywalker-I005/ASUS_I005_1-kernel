@@ -1480,9 +1480,17 @@ static ssize_t vdd_store(struct device *dev, struct device_attribute *attr, cons
 				if (tmp)
 					printk("[AURA_MS51] Failed to enable regulator vdd\n");
 				VDD_count++;
+				// Wait 300ms for IC power on
+				msleep(300);
 			}
 		}else {
-			gpio_set_value(platform_data->logo_5p0_en, 1);
+			tmp = gpio_get_value(platform_data->logo_5p0_en);
+			if(!tmp){
+				gpio_set_value(platform_data->logo_5p0_en, 1);
+				// Wait 300ms for IC power on
+				msleep(300);
+			}else
+				printk("[AURA_MS51] VDD already enable. %d\n", tmp);
 		}
 	}else {
 		printk("[AURA_MS51] VDD set LOW\n");
@@ -1626,30 +1634,38 @@ static void aura_sync_unregister(struct ms51_platform_data *pdata)
 // Resume work
 static void ms51_resume_work(struct work_struct *work)
 {
-	int err=0;
+	int err=0, tmp=0;
 	unsigned char ver_major = 0;
 	unsigned char ver_minor = 0;
 	unsigned char data[4] = {0};
 
+	wake_lock(&g_pdata->aura_wake_lock);
 	if(g_pdata->hw_stage < 5) {
 		if(!VDD_count){
 			err = regulator_enable(g_pdata->regulator_vdd);
 			if (err)
 				printk("[AURA_MS51] Failed to enable regulator vdd\n");
 			VDD_count++;
+			// Wait 300ms for IC power on
+			msleep(300);
 		}else
 			printk("[AURA_MS51] ms51_resume_work : already enabled VDD_count %d\n", VDD_count);
-	}else
-		gpio_set_value(g_pdata->logo_5p0_en, 1);
-
-	// Wait 350ms for IC power on
-	msleep(350);
+	}else{
+		tmp = gpio_get_value(g_pdata->logo_5p0_en);
+		if(!tmp){
+			gpio_set_value(g_pdata->logo_5p0_en, 1);
+			// Wait 300ms for IC power on
+			msleep(300);
+		}else
+			printk("[AURA_MS51] VDD already enable. %d\n", tmp);
+	}
 
 	mutex_lock(&g_pdata->ms51_mutex);
 	err = ms51_read_words(g_pdata->client, 0xCB01, data);
 	if (err != 1){
 		printk("[AURA_MS51] ms51_resume_work read FW:err %d\n", err);
 		mutex_unlock(&g_pdata->ms51_mutex);
+		wake_unlock(&g_pdata->aura_wake_lock);
 		return;
 	}
 	mutex_unlock(&g_pdata->ms51_mutex);
@@ -1657,6 +1673,7 @@ static void ms51_resume_work(struct work_struct *work)
 	ver_minor = data[1];
 
 	printk("[AURA_MS51] ms51_resume_work : FW version 0x%02x%02x\n", ver_major,ver_minor);
+	wake_unlock(&g_pdata->aura_wake_lock);
 }
 
 // Check FW work
@@ -1673,8 +1690,8 @@ static void ms51_check_fw_work(struct work_struct *work)
 	}
 	memset(buf_cmd,0,sizeof(unsigned char)* (BUF_LEN+1));
 
-// Wait 350ms for IC power on.\n");
-	msleep(350);
+// Wait 300ms for IC power on.\n");
+	msleep(300);
 
 //check i2c function
 	if (!i2c_check_functionality(g_pdata->client->adapter, I2C_FUNC_I2C)) {
@@ -1929,6 +1946,9 @@ static int ms51_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		goto unled;
 	}
 	INIT_WORK(&platform_data->resume_work, ms51_resume_work);
+
+// Init wake lock
+	wake_lock_init(&platform_data->aura_wake_lock, &client->dev, "aura_wake_lock");
 
 //#ifdef ASUS_FTM
 #if 0

@@ -2421,6 +2421,8 @@ static int rog5_inbox_usb_probe(struct hid_device *hdev, const struct hid_device
 	INIT_DELAYED_WORK(&disable_autosuspend_work, disable_autosuspend_worker);
 	schedule_delayed_work(&disable_autosuspend_work, msecs_to_jiffies(1000));
 
+	device_init_wakeup(&interface_to_usbdev(to_usb_interface(hdev->dev.parent))->dev, true);
+
 #if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT
 	inbox_connect();
 #endif

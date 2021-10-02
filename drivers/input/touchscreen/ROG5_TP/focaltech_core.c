@@ -87,7 +87,8 @@ int fp_press = 0; // 0 : up , 1 : O , 2 : F
 //bool fp_filter = false;
 ktime_t start ;
 bool first_down = false;
-unsigned int time_delta;
+//unsigned int time_delta;
+bool burst_cancel = false;
 /*****************************************************************************
 * Static function prototypes
 *****************************************************************************/
@@ -117,7 +118,8 @@ int fts_wait_tp_to_valid(void)
         if ((ret < 0) || (idh != chip_idh) || (idl != chip_idl)) {
             FTS_DEBUG("TP Not Ready,ReadData:0x%02x%02x", idh, idl);
         } else if ((idh == chip_idh) && (idl == chip_idl)) {
-            FTS_INFO("TP Ready,Device ID:0x%02x%02x", idh, idl);
+	      if (fts_data->log_level >= 2)
+		  FTS_INFO("TP Ready,Device ID:0x%02x%02x", idh, idl);
             return 0;
         }
         cnt++;
@@ -136,7 +138,7 @@ int fts_wait_tp_to_valid(void)
 *****************************************************************************/
 void fts_tp_state_recovery(struct fts_ts_data *ts_data)
 {
-    FTS_FUNC_ENTER();
+//    FTS_FUNC_ENTER();
     /* wait tp stable */
     fts_wait_tp_to_valid();
     /* recover TP charger state 0x8B */
@@ -145,12 +147,13 @@ void fts_tp_state_recovery(struct fts_ts_data *ts_data)
     fts_ex_mode_recovery(ts_data);
     /* recover TP gesture state 0xD0 */
     fts_gesture_recovery(ts_data);
-    FTS_FUNC_EXIT();
+//    FTS_FUNC_EXIT();
 }
 
 int fts_reset_proc(int hdelayms)
 {
-    FTS_DEBUG("tp reset");
+    if (fts_data->log_level >= 2)    
+	FTS_DEBUG("tp reset");
     gpio_direction_output(fts_data->pdata->reset_gpio, 0);
     msleep(5);
     gpio_direction_output(fts_data->pdata->reset_gpio, 1);
@@ -181,7 +184,7 @@ void fts_irq_enable(void)
 {
 //    unsigned long irqflags = 0;
 
-    FTS_FUNC_ENTER();
+//    FTS_FUNC_ENTER();
 //    spin_lock_irqsave(&fts_data->irq_lock, irqflags);
 
     if (fts_data->irq_disabled) {
@@ -328,7 +331,7 @@ static int fts_get_ic_information(struct fts_ts_data *ts_data)
     ts_data->ic_info.is_incell = FTS_CHIP_IDC;
     ts_data->ic_info.hid_supported = FTS_HID_SUPPORTTED;
 
-    FTS_FUNC_ENTER();
+//    FTS_FUNC_ENTER();
     do {
         ret = fts_read_reg(FTS_REG_CHIP_ID, &chip_id[0]);
         ret = fts_read_reg(FTS_REG_CHIP_ID2, &chip_id[1]);
@@ -370,7 +373,7 @@ static int fts_get_ic_information(struct fts_ts_data *ts_data)
 
     FTS_INFO("get ic information, chip id = 0x%02x%02x",
              ts_data->ic_info.ids.chip_idh, ts_data->ic_info.ids.chip_idl);
-    FTS_FUNC_EXIT();
+//    FTS_FUNC_EXIT();
     return 0;
 }
 
@@ -410,7 +413,7 @@ void fts_release_all_finger(void)
     u32 max_touches = fts_data->pdata->max_touch_number;
 #endif
 
-//    FTS_FUNC_ENTER();
+    FTS_FUNC_ENTER();
     mutex_lock(&fts_data->report_mutex);
 #if FTS_MT_PROTOCOL_B_EN
     if (fts_data->atr_press) {
@@ -581,7 +584,7 @@ static int fts_input_report_b(struct fts_ts_data *data)
 		    }
 		    input_report_abs(data->input_dev, ABS_MT_TOUCH_MAJOR, events[i].p);
 		    input_report_abs(data->input_dev, ABS_MT_POSITION_X, events[i].x);
-		    input_report_abs(data->input_dev, ABS_MT_POSITION_Y, events[i].y);
+		    input_report_abs(data->input_dev, ABS_MT_POSITION_Y, events[i].y);		      
 		    data->finger_press = true;
 		
 		  // ATR
@@ -599,12 +602,10 @@ static int fts_input_report_b(struct fts_ts_data *data)
 		    FTS_DEBUG("[B](id,x,y,area,rate,touchs,event_time)(%d,%d,%d,%d,%d,%d,%llu) DOWN!",
 		      events[i].id,
 		      events[i].x, events[i].y,
-		      events[i].p, events[i].rate,touchs,events[i].time);		  
+		      events[i].p, events[i].rate,touchs,events[i].time); 
 		} else {	      
-		    FTS_DEBUG("[B](id,x,y,area,rate,touchs)(%d,%d,%d,%d,%d,%d) DOWN!",
-		      events[i].id,
-		      events[i].x, events[i].y,
-		      events[i].p, events[i].rate,touchs);
+		    FTS_INFO("[B](id,x,y)(%d,%d,%d) DOWN!",
+		      events[i].id,(events[i].x)/16, (events[i].y)/16);
 		}
 	    }
         } else {
@@ -613,7 +614,7 @@ static int fts_input_report_b(struct fts_ts_data *data)
 		input_mt_report_slot_state(data->input_dev, MT_TOOL_FINGER, false);	    
 		data->touchs &= ~BIT(events[i].id);
 		if (data->log_level >= 1) {
-		    FTS_DEBUG("[B]id %d UP !", events[i].id);
+		    FTS_INFO("[B]id %d UP !", events[i].id);
 		}
 	    }
 	    
@@ -638,7 +639,7 @@ static int fts_input_report_b(struct fts_ts_data *data)
 		    }
 		    va_reported = true;
 		    input_mt_slot(data->input_dev, i);
-		    input_set_timestamp(data->input_dev, ktime_get());		
+		    input_set_timestamp(data->input_dev, ktime_get());
 		    input_mt_report_slot_state(data->input_dev, MT_TOOL_FINGER, false);
 		}
             }
@@ -653,7 +654,7 @@ static int fts_input_report_b(struct fts_ts_data *data)
 	    
             if (!data->atr_press) {
 	      if (!fts_data->wait_reset){
-		  FTS_DEBUG("[B]Points All Up!");		
+		  FTS_DEBUG("[B]Points All Up!");
 		  input_report_key(data->input_dev, BTN_TOUCH, 0);
 	      }
 	      fp_press = 0;
@@ -677,13 +678,14 @@ static int fts_input_report_b(struct fts_ts_data *data)
 	      FTS_INFO("atr pressed, ignore touch up");
         } else {
 	    if (!data->atr_press) {
-	      if ((data->perftime == 1) && !first_down) { 
+/*	      if ((data->perftime == 1) && !first_down) { 
 		  start = ktime_get();
 		  first_down = true;
-		  FTS_INFO("touch down");
 	      }
+*/	      
 	      if (!data->fp_filter) {
-		  input_report_key(data->input_dev, BTN_TOUCH, 1);}
+		  input_report_key(data->input_dev, BTN_TOUCH, 1);
+	      }
 	    }
         }
     }
@@ -764,9 +766,9 @@ static int fts_read_touchdata(struct fts_ts_data *data)
 {
     int ret = 0;
     u8 *buf = data->point_buf;
-
     memset(buf, 0xFF, data->pnt_buf_size);
     buf[0] = 0x01;
+
     if (data->gesture_mode) {
         if (0 == fts_gesture_readdata(data, NULL)) {
 //            FTS_INFO("succuss to get gesture data in irq handler");
@@ -775,6 +777,35 @@ static int fts_read_touchdata(struct fts_ts_data *data)
     }
 
     ret = fts_read(buf, 1, buf + 1, data->pnt_buf_size - 1);
+    
+    if (ret < 0) {
+        FTS_ERROR("read touchdata failed, ret:%d", ret);
+        return ret;
+    }
+
+    if (data->log_level >= 3) {
+        fts_show_touch_buffer(buf, data->pnt_buf_size);
+    }
+
+    return 0;
+}
+
+static int fts_burst_read_touchdata(struct fts_ts_data *data)
+{
+    int ret = 0;
+    u8 *buf = data->point_buf;
+    memset(buf, 0xFF, data->pnt_buf_size);
+    buf[0] = 0x01;
+
+    if (data->gesture_mode) {
+        if (0 == fts_gesture_readdata(data, NULL)) {
+//            FTS_INFO("succuss to get gesture data in irq handler");
+            return 1;
+        }
+    }
+
+    ret = fts_read(buf, 1, buf + 1, data-> burst_data_len);
+
     if (ret < 0) {
         FTS_ERROR("read touchdata failed, ret:%d", ret);
         return ret;
@@ -798,13 +829,29 @@ static int fts_read_parse_touchdata(struct fts_ts_data *data)
     u8 *buf = data->point_buf;
     ktime_t scan_time;
     u8 fw_tpid = 0 , mode = 0;
+
+    if (!burst_cancel && (fts_data->report_rate == REPORT_RATE_2))
+    {
+	ret = fts_burst_read_touchdata(data);
+    } else 
+	ret = fts_read_touchdata(data);
     
-    ret = fts_read_touchdata(data);
     if (ret) {
         return ret;
     }
+
     data->point_num = buf[FTS_TOUCH_POINT_NUM] & 0x0F;
+    
+    if ((fts_data->report_rate == REPORT_RATE_2) && (data->point_num > BURST_MAX_POINT)) {
+	ret = fts_read_touchdata(data);
+	data->point_num = buf[FTS_TOUCH_POINT_NUM] & 0x0F;
+	burst_cancel = true;
+    } else {
+        burst_cancel = false;
+    } 
+    
     data->touch_point = 0;
+    
     if (data->ic_info.is_incell) {
         if ((data->point_num == 0x0F) && (buf[2] == 0xFF) && (buf[3] == 0xFF)
             && (buf[4] == 0xFF) && (buf[5] == 0xFF) && (buf[6] == 0xFF)) {
@@ -824,6 +871,7 @@ static int fts_read_parse_touchdata(struct fts_ts_data *data)
     for (i = 0; i < max_touch_num; i++) {
         base = FTS_ONE_TCH_LEN * i;
         pointid = (buf[FTS_TOUCH_ID_POS + base]) >> 4;
+
 	if (pointid >= FTS_MAX_ID)
             break;
 	else if (pointid >= max_touch_num) {
@@ -873,14 +921,14 @@ static int fts_read_parse_touchdata(struct fts_ts_data *data)
 	    events[i].time = ktime_sub_us(data->irq_received,scan_time);
 	}
         if (EVENT_DOWN(events[i].flag) && (data->point_num == 0)) {
-            FTS_INFO("abnormal touch data from fw");
+            FTS_ERROR("abnormal touch data from fw");
 	    fts_show_touch_buffer(buf, data->pnt_buf_size);
             return -EIO;
         }
     }
 
     if (data->touch_point == 0) {
-        FTS_INFO("no touch point information");
+        FTS_ERROR("no touch point information");
 	fts_show_touch_buffer(buf, data->pnt_buf_size);
 	fts_read_reg(FTS_REG_TOUCH_ID, &fw_tpid);
 	msleep(10);
@@ -944,7 +992,6 @@ static irqreturn_t fts_irq_handler(int irq, void *data)
         }
     }
 #endif
-
     if ((fts_data->perftime == 1) || (fts_data->realtime == 1) ) {
 	fts_data->irq_received = ktime_get();
 //	FTS_INFO("irq time %llu",fts_data->irq_received);
@@ -976,7 +1023,7 @@ static int fts_input_init(struct fts_ts_data *ts_data)
     struct fts_ts_platform_data *pdata = ts_data->pdata;
     struct input_dev *input_dev;
 
-    FTS_FUNC_ENTER();
+//    FTS_FUNC_ENTER();
     input_dev = input_allocate_device();
     if (!input_dev) {
         FTS_ERROR("Failed to allocate memory for input device");
@@ -1033,7 +1080,7 @@ static int fts_input_init(struct fts_ts_data *ts_data)
 
     ts_data->input_dev = input_dev;
 
-    FTS_FUNC_EXIT();
+//    FTS_FUNC_EXIT();
     return 0;
 }
 
@@ -1046,6 +1093,8 @@ static int fts_report_buffer_init(struct fts_ts_data *ts_data)
     point_num = ts_data->pdata->max_touch_number;
     ts_data->pnt_buf_size = point_num * FTS_ONE_TCH_LEN + 3;
     ts_data->point_buf = (u8 *)kzalloc(ts_data->pnt_buf_size + 1, GFP_KERNEL);
+    ts_data->burst_data_len = BURST_MAX_POINT * FTS_ONE_TCH_LEN + 3; 
+    
     if (!ts_data->point_buf) {
         FTS_ERROR("failed to alloc memory for point buf");
         return -ENOMEM;
@@ -1170,7 +1219,7 @@ static int fts_power_source_ctrl(struct fts_ts_data *ts_data, int enable)
 //    FTS_FUNC_ENTER();
     if (enable) {
         if (ts_data->power_disabled) {
-            FTS_DEBUG("regulator enable !");
+//            FTS_DEBUG("regulator enable !");
             gpio_direction_output(ts_data->pdata->reset_gpio, 0);
             msleep(1);
 
@@ -1193,7 +1242,7 @@ static int fts_power_source_ctrl(struct fts_ts_data *ts_data, int enable)
         }
     } else {
         if (!ts_data->power_disabled) {
-            FTS_DEBUG("regulator disable !");
+//            FTS_DEBUG("regulator disable !");
             gpio_direction_output(ts_data->pdata->reset_gpio, 0);
             msleep(10);
 	    gpio_direction_output(ts_data->pdata->vddio, 0);
@@ -1230,7 +1279,7 @@ static int fts_power_source_init(struct fts_ts_data *ts_data)
 {
     int ret = 0;
 
-    FTS_FUNC_ENTER();
+//    FTS_FUNC_ENTER();
     ts_data->vdd = regulator_get(ts_data->dev, "vdd");
     if (IS_ERR_OR_NULL(ts_data->vdd)) {
         ret = PTR_ERR(ts_data->vdd);
@@ -1272,7 +1321,7 @@ static int fts_power_source_init(struct fts_ts_data *ts_data)
         FTS_ERROR("fail to enable power(regulator)");
     }
 
-    FTS_FUNC_EXIT();
+//    FTS_FUNC_EXIT();
     return ret;
 }
 
@@ -1336,7 +1385,7 @@ static int fts_gpio_configure(struct fts_ts_data *data)
 {
     int ret = 0;
 
-    FTS_FUNC_ENTER();
+//    FTS_FUNC_ENTER();
     /* request irq gpio */
     if (gpio_is_valid(data->pdata->irq_gpio)) {
         ret = gpio_request(data->pdata->irq_gpio, "fts_irq_gpio");
@@ -1383,7 +1432,7 @@ static int fts_gpio_configure(struct fts_ts_data *data)
     }
     
     
-    FTS_FUNC_EXIT();
+//    FTS_FUNC_EXIT();
     return 0;
     
 err_vddio_dir:
@@ -1587,7 +1636,7 @@ static int drm_check_dt(struct device_node *np)
     int count = 0;
     struct device_node *node = NULL;
     struct drm_panel *panel = NULL;
-    FTS_FUNC_ENTER();
+//    FTS_FUNC_ENTER();
     count = of_count_phandle_with_args(np, "panel", NULL);
     if (count <= 0) {
         FTS_ERROR("find drm_panel count(%d) fail", count);
@@ -1606,7 +1655,7 @@ static int drm_check_dt(struct device_node *np)
     }
 
     FTS_ERROR("no find drm_panel");
-    FTS_FUNC_EXIT();
+//    FTS_FUNC_EXIT();
     return -ENODEV;
 }
 
@@ -1622,6 +1671,8 @@ static int drm_notifier_callback(struct notifier_block *self,
     int *blank = NULL;
     struct fts_ts_data *ts_data = container_of(self, struct fts_ts_data,
                                   fb_notif);
+    bool proxy_status = false;
+    
 //    FTS_FUNC_ENTER();
     if (!evdata) {
         FTS_ERROR("evdata is null");
@@ -1636,26 +1687,45 @@ static int drm_notifier_callback(struct notifier_block *self,
         if (DRM_PANEL_EARLY_EVENT_BLANK == event) {
 	    FTS_INFO("DRM_PANEL_BLANK_UNBLANK,Display resume");
 	} else if (DRM_PANEL_EVENT_BLANK == event) {
-	  FTS_INFO("DRM_PANEL_EVENT_BLANK,Display on");
-	  if (ts_data->next_resume_isaod) {
-	      FTS_INFO("Display resume into AOD, not care");
-	  } else { 
-	      if (fts_data->fp_report_type == 1) {
-		  FTS_INFO("resume into hbm mode");
-	      } else {
-		  fts_release_all_finger();
-		  queue_work(fts_data->ts_workqueue, &fts_data->resume_work);
+	  FTS_INFO("DRM_PANEL_EVENT_BLANK,Display on irq %d",ts_data->irq_off);
+          if (ts_data->irq_off == ENABLE) {
+	      ts_data->irq_off = DISABLE;
+	      fts_release_all_finger();
+	      fts_irq_enable();
+	  } else {
+		if (ts_data->next_resume_isaod) {
+		    FTS_INFO("Display resume into AOD, not care");
+		} else { 
+		    if (fts_data->fp_report_type == 1) {
+		      FTS_INFO("resume into hbm mode");
+		    } else {
+		      fts_release_all_finger();
+		      queue_work(fts_data->ts_workqueue, &fts_data->resume_work);
+		    }
 	      }
 	  }
-        }
+	}
         break;
     case DRM_PANEL_BLANK_POWERDOWN:
 	ts_data->display_state = 0;
         FTS_INFO("DRM_PANEL_BLANK_POWERDOWN,Display off");
         if (DRM_PANEL_EARLY_EVENT_BLANK == event) {
-            cancel_work_sync(&fts_data->resume_work);
-	    ts_data->fp_filter = false;
-            fts_ts_suspend(ts_data->dev);
+	    ts_data->irq_off = DISABLE;
+	    if (ts_data->phone_call_state == ENABLE && !ts_data->suspended) {
+		proxy_status = proximityStatus();
+		if (proxy_status) {
+		    ts_data->irq_off = ENABLE;
+		    fts_irq_disable();
+    		    FTS_INFO("Proximity on and on phone call, disable irq not suspend");
+      	            fts_release_all_finger();
+		}
+	    }
+            if (ts_data->irq_off != ENABLE) {
+		cancel_work_sync(&fts_data->resume_work);
+		ts_data->fp_filter = false;
+		fts_ts_suspend(ts_data->dev);
+	      
+	    }
         } else if (DRM_PANEL_EVENT_BLANK == event) {
 //            FTS_INFO("suspend: event = %lu, not care", event);
         }
@@ -1667,13 +1737,17 @@ static int drm_notifier_callback(struct notifier_block *self,
 	ts_data->fp_filter = false;
 	if (!ts_data->suspended) {
 	    FTS_INFO("Display AOD mode , suspend touch");
+	    if (ts_data->irq_off == ENABLE) {
+	      ts_data->irq_off = DISABLE;
+	      fts_irq_enable();
+	    }
 	    cancel_work_sync(&fts_data->resume_work);
 	    fts_ts_suspend(ts_data->dev);
 	}
 
 	break;
     case DRM_PANEL_BLANK_FPS_CHANGE:
-//        FTS_INFO("DRM_PANEL_BLANK_FPS_CHANGE , refers rate %d",evdata->refresh_rate);
+        FTS_INFO("DRM_PANEL_BLANK_FPS_CHANGE , refers rate %d",evdata->refresh_rate);
 	break;
     default:
 //        FTS_INFO("DRM BLANK(%d) do not need process", *blank);
@@ -1752,7 +1826,7 @@ static int fts_ts_probe_entry(struct fts_ts_data *ts_data)
     int ret = 0;
     int pdata_size = sizeof(struct fts_ts_platform_data);
 
-    FTS_FUNC_ENTER();
+//    FTS_FUNC_ENTER();
     FTS_INFO("%s", FTS_DRIVER_VERSION);
     ts_data->pdata = kzalloc(pdata_size, GFP_KERNEL);
     if (!ts_data->pdata) {
@@ -2054,7 +2128,7 @@ static int fts_ts_suspend(struct device *dev)
     u8 reg_e5 = 0;
     u8 reg_e6 = 0;
     
-    FTS_FUNC_ENTER();
+//    FTS_FUNC_ENTER();
     if (ts_data->suspended) {
         FTS_INFO("Already in suspend state");
         return 0;
@@ -2075,10 +2149,10 @@ static int fts_ts_suspend(struct device *dev)
     enter_gesture_mode = is_enter_gesture_mode(ts_data);
 //    FTS_INFO("Is enter gesture mode %d",enter_gesture_mode);
     if (enter_gesture_mode == 1) {
-        FTS_INFO("Gesture mode enabled , request enter gesture mode");
+        FTS_INFO("Gesture mode enabled , enter gesture mode");
         gesture_suspend_ok = fts_gesture_suspend(ts_data);
 	if (gesture_suspend_ok > 0) {
-	  FTS_INFO("Enter gesture mode succussed");
+//	  FTS_INFO("Enter gesture mode succussed");
 	}
 	if (enable_irq_wake(ts_data->irq)) {
 	  FTS_DEBUG("enable_irq_wake(irq:%d) fail", ts_data->irq);
@@ -2086,7 +2160,7 @@ static int fts_ts_suspend(struct device *dev)
     }
     
     if ((gesture_suspend_ok < 0) || (enter_gesture_mode!=1)) {  
-        FTS_INFO("make TP enter into sleep mode");
+//        FTS_INFO("make TP enter into sleep mode");
 	fts_irq_disable();
         ret = fts_write_reg(FTS_REG_POWER_MODE, FTS_REG_POWER_MODE_SLEEP);
         if (ret < 0)
@@ -2105,7 +2179,7 @@ static int fts_ts_suspend(struct device *dev)
     fts_release_all_finger();
     ts_data->suspended = true;
     fp_press = 0;
-    FTS_FUNC_EXIT();
+//    FTS_FUNC_EXIT();
     return 0;
 }
 
@@ -2115,17 +2189,18 @@ static int fts_ts_resume(struct device *dev)
     int enter_gesture_mode = 0;
     u8 reg_e6 = 0;
     
-    FTS_FUNC_ENTER();
+//    FTS_FUNC_ENTER();
     if (!ts_data->suspended) {
         FTS_DEBUG("Already in awake state");
         return 0;
     }
     
     enter_gesture_mode = is_enter_gesture_mode(ts_data);
-    FTS_INFO("Is enter gesture mode %d",enter_gesture_mode);   
+//    FTS_INFO("Is enter gesture mode %d",enter_gesture_mode);   
     if (ts_data->gesture_mode && (enter_gesture_mode == 1)) {
 	fts_read_reg(FTS_REG_ILLEGAL_GESTURE, &reg_e6);
 	FTS_INFO("Read reg status before gesture resume E6 0x%X ",reg_e6);
+	msleep(2);
         fts_gesture_resume(ts_data);
     }
     
@@ -2147,7 +2222,7 @@ static int fts_ts_resume(struct device *dev)
 #endif
     fts_ex_fun_recovery(ts_data);
     
-    FTS_INFO("FTS resume , enable irq");
+    FTS_INFO("TP resume ");
     if (enter_gesture_mode == 1) {      
 	if (disable_irq_wake(ts_data->irq)) {
 	    FTS_DEBUG("disable_irq_wake(irq:%d) fail", ts_data->irq);
@@ -2159,7 +2234,7 @@ static int fts_ts_resume(struct device *dev)
     fp_press = 0;
     asus_game_recovery(ts_data);
     report_rate_recovery(ts_data);
-    FTS_FUNC_EXIT();
+//    FTS_FUNC_EXIT();
     return 0;
 }
 

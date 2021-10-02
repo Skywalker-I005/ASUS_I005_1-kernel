@@ -123,6 +123,12 @@
 			qcom,display-topology = <2 2 1>;
 			qcom,default-topology-index = <0>;
 		};
+		timing@3 {
+			qcom,mdss-dsi-panel-phy-timings = [00 1E 08 07 18 16 08
+				08 08 02 04 00 1A 3C];
+			qcom,display-topology = <2 2 1>;
+			qcom,default-topology-index = <0>;
+		};
 	};
 };
 
@@ -283,6 +289,7 @@
 		pinctrl-names = "fp_default";
 		pinctrl-0 = <&fp_irq_default &fp_reset_default>;
 		status = "okay";
+		panel = <&dsi_ams667uu07_fhd_plus_dsc_cmd &dsi_ams678_fhd_plus_dsc_cmd &dsi_ams678_er2_fhd_plus_dsc_cmd>;
  	};
 
 	//Disable qcom default FP setting

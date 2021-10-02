@@ -16,7 +16,7 @@
 #define FTS_REG_TOUCH_SENSITIVITY           0x91
 
 #define FTS_REG_REPORT_RATE                 0x88
-#define FTS_REG_REPORT_RATE_600             0xE3
+#define FTS_REG_REPORT_RATE_BURST           0xE3
 
 #define TOTAL_GAME_USED_SLOT                10
 
@@ -54,6 +54,7 @@
 #define ASUS_TOUCH_AREA_POS                  8 // FP area, high 4 bits
 #define ASUS_TOUCH_RATE_POS                  8 //report rate, low 4 bits
 
+#define BURST_MAX_POINT                      6
 /*****************************************************************************
 * 1. Global variable or extern global variabls/functions
 *****************************************************************************/
@@ -76,6 +77,7 @@ struct atr_queue {
 	struct atr_data* data;
 };
 
+extern bool proximityStatus(void);
 /*****************************************************************************
 * 2. Static function prototypes
 *******************************************************************************/

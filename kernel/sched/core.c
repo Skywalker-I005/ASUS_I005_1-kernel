@@ -4952,7 +4952,9 @@ static bool check_same_owner(struct task_struct *p)
     //peace elite
     if(!strncmp(p->comm, "RenderThread", strlen("RenderThread")) && !strncmp("Thread-", current->comm, 7))
         return true;
-    
+
+    if(!strncmp("perf@2.2-serv", current->comm, strlen("perf@2.2-serv")))
+        return true;    
 
 	rcu_read_lock();
 	pcred = __task_cred(p);

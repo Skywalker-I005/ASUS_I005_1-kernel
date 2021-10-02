@@ -106,7 +106,14 @@ void asus_gesture_report(struct fts_ts_data *ts_data, int gesture_id)
 	  write_fp_xy(ts_data);	  
 	  proxy_skip = true;
 	}
-        break;
+
+	if ((ts_data->aod_enable == ENABLE) && (ts_data-> fp_report_type==0)) {  // AOD only
+	  FTS_INFO("key L");
+	  gesture = KEY_GESTURE_L;
+	  proxy_skip = false;
+	}
+
+	break;
     case GESTURE_F:
 	if ((ts_data->fp_enable == 1) && (ts_data-> fp_report_type!=0)) {
 	  FTS_INFO("key F");
@@ -121,6 +128,13 @@ void asus_gesture_report(struct fts_ts_data *ts_data, int gesture_id)
 	  write_fp_xy(ts_data);
 	  proxy_skip = true;
 	}
+ 
+	if ((ts_data->aod_enable == ENABLE) && (ts_data-> fp_report_type==0)) { // AOD only
+	  FTS_INFO("key L");
+	  gesture = KEY_GESTURE_L;
+	  proxy_skip = false;
+	}
+
         break;
     case GESTURE_U:
         if ((ts_data->fp_enable == 1) && (ts_data-> fp_report_type!=0)) {
@@ -137,6 +151,13 @@ void asus_gesture_report(struct fts_ts_data *ts_data, int gesture_id)
 	  gesture = KEY_GESTURE_L;
 	  proxy_skip = true;
 	}
+	
+	if ((ts_data->aod_enable == ENABLE) && (ts_data-> fp_report_type==0)) { // AOD only
+	  FTS_INFO("key L");
+	  gesture = KEY_GESTURE_L;
+	  proxy_skip = false;
+	}
+
 	break;
 //Zenmotion
     case GESTURE_UP:
@@ -260,7 +281,7 @@ int set_gesture_register (struct fts_ts_data *ts_data)
     reg_D6 = 0x00;
     reg_D7 = 0x00;
     
-    if (ts_data->fp_enable){
+    if ((ts_data->fp_enable)||(ts_data->aod_enable == ENABLE)){
         reg_D1 = reg_D1|fod_bit;
     }
     if (ts_data->dclick_mode == 1){
@@ -321,7 +342,7 @@ int is_enter_gesture_mode (struct fts_ts_data *ts_data)
 {
     int enable_gesture = 0;
     
-    if (ts_data->fp_enable == 1) {
+    if ((ts_data->fp_enable == 1)|| (ts_data->aod_enable == ENABLE)) {
         enable_gesture = 1;
 	if (!ts_data->suspended )
 	  FTS_INFO("FP auth enable , enter gesture mode");
@@ -353,7 +374,7 @@ static ssize_t asus_gesture_proc_type_read(struct file *file, char __user *buf, 
 	ssize_t ret = 0;
 	char *buff = NULL;
 	int offset = 0;
-	FTS_FUNC_ENTER();
+//	FTS_FUNC_ENTER();
 	buff = kzalloc(100, GFP_KERNEL);
 	if (!buff)
 		return -ENOMEM;
@@ -374,7 +395,7 @@ static ssize_t asus_gesture_proc_type_write(struct file *filp, const char *buff,
 	char gesture_type_buf[16] = {'0'};
 	char messages[16];
 	memset(messages, 0, sizeof(messages));
-	FTS_FUNC_ENTER();
+//	FTS_FUNC_ENTER();
 	
 	if (len > 16)
 		len = 16;
@@ -385,14 +406,14 @@ static ssize_t asus_gesture_proc_type_write(struct file *filp, const char *buff,
 	memset(gesture_buf, 0, sizeof(gesture_buf));
 	sprintf(gesture_buf, "%s", messages);
 	gesture_buf[len] = '\0';
-	FTS_INFO("fts_gesture_store %s ! length %d", gesture_buf, len);
+//	FTS_INFO("fts_gesture_store %s ! length %d", gesture_buf, len);
 
 	memset(gesture_type_buf, 0, sizeof(gesture_type_buf));
 	gesture_type_buf[8] = '\0';
 	for (tmp = 0; tmp < len; tmp++) {
 		gesture_type_buf[tmp] = gesture_buf[len-tmp-1];
 	}
-	FTS_INFO("fts_gesture_store %s ! length %d", gesture_type_buf, len);
+//	FTS_INFO("fts_gesture_store %s ! length %d", gesture_type_buf, len);
 	if (gesture_type_buf[0] == '1') {
 		fts_data->gesture_mode_enable = ENABLE;
 		FTS_INFO("gesture_mode enable !");
@@ -401,7 +422,7 @@ static ssize_t asus_gesture_proc_type_write(struct file *filp, const char *buff,
 
 	if (gesture_type_buf[7] == '1') {
 		fts_data->music_control = ENABLE;
-		printk("[Focal][Touch] music_control enable ! \n");
+		printk("music_control enable ! \n");
 	} else
 		fts_data->music_control = DISABLE;
 
@@ -445,7 +466,7 @@ static ssize_t asus_gesture_proc_dclick_write(struct file *filp, const char *buf
 	char messages[256];
 	memset(messages, 0, sizeof(messages));
 
-	FTS_FUNC_ENTER();
+//	FTS_FUNC_ENTER();
 	
 	if (len > 256)
 		len = 256;
@@ -468,7 +489,7 @@ static ssize_t asus_gesture_proc_swipeup_read(struct file *file, char __user *bu
 	ssize_t ret = 0;
 	char *buff = NULL;
 
-	FTS_FUNC_ENTER();
+//	FTS_FUNC_ENTER();
 	
 	buff = kzalloc(100, GFP_KERNEL);
 	if (!buff)
@@ -520,7 +541,7 @@ int asus_gesture_init(struct fts_ts_data *ts_data)
 {
     struct input_dev *input_dev = ts_data->input_dev;
 
-    FTS_FUNC_ENTER();
+//   FTS_FUNC_ENTER();
 
 //FOD
     input_set_capability(input_dev, EV_KEY, KEY_GESTURE_O);
@@ -567,6 +588,6 @@ int asus_gesture_init(struct fts_ts_data *ts_data)
     proc_create(DCLICK, 0666, NULL, &asus_gesture_proc_dclick_ops);
     proc_create(SWIPEUP, 0666, NULL, &asus_gesture_proc_swipeup_ops);
 
-    FTS_FUNC_EXIT();
+//    FTS_FUNC_EXIT();
     return 0;
 }
