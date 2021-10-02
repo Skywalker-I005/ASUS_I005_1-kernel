@@ -670,7 +670,6 @@ int asus_extcon_set_state(struct extcon_dev *edev, int cable_state)
 	/* Check whether the external connector's state is changed. */
 	if (!asus_is_extcon_changed(edev, cable_state) || !boot_completed_flag)
 		goto out;
-
 	/* Don't check mutual exclusiveness & property since the state no longer represents multi-cable. */
 	/* Update the state for a external connector. */
 	edev->state = cable_state;

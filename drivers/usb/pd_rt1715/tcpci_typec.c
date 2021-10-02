@@ -737,6 +737,19 @@ static inline void typec_custom_src_attached_entry(
 	tcpci_report_power_control(tcpc_dev, true);
 	tcpci_sink_vbus(tcpc_dev, TCP_VBUS_CTRL_TYPEC,
 		TCPC_VBUS_SINK_5V, tcpc_dev->typec_usb_sink_curr);
+
+	if (!tcpc_dev->partner) {
+		/* Make sure we don't report stale identity information */
+		memset(&tcpc_dev->partner_ident, 0,
+			sizeof(tcpc_dev->partner_ident));
+		tcpc_dev->partner_desc.identity = &tcpc_dev->partner_ident;
+		tcpc_dev->partner_desc.usb_pd = tcpc_dev->pd_capable;
+		tcpc_dev->partner = typec_register_partner(tcpc_dev->typec_port,
+						  &tcpc_dev->partner_desc);
+		if (!tcpc_dev->partner)
+			TYPEC_INFO("register partner fail\r\n");
+	}
+
 #endif	/* CONFIG_TYPEC_CAP_CUSTOM_SRC */
 }
 

@@ -44,6 +44,7 @@ extern void create_Grip_Slide_force_proc_file(void);
 extern void create_Grip_Slide_min_pos_proc_file(void);
 extern void create_Grip_Slide_max_pos_proc_file(void);
 extern void create_Grip_Slide_vib_en_proc_file(void);
+void create_Grip_Slide_tap_priority_proc_file(void);
 
 extern void create_Grip_Swipe_en_proc_file(void);
 extern void create_Grip_Swipe_velocity_proc_file(void);
@@ -112,6 +113,8 @@ extern void Grip_Driver_IRQ_EN(bool flag);
 extern void Grip_Chip_IRQ_EN(bool flag);
 
 extern int grip_game_gesture_status(void);
+void Grip_Driver_IRQ_EN(bool flag);
+
 
 //extern enum DEVICE_PROJID g_ASUS_prjID;
 //extern enum DEVICE_HWID g_ASUS_hwID;

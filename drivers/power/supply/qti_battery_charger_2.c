@@ -63,6 +63,7 @@ extern void qti_charge_notify_device_not_charge(void);
 extern void get_cc_status_from_ADSP(void);
 extern int rt_chg_get_remote_cc(void);
 extern bool side_port_cc_status;
+extern bool g_Charger_mode;
 
 //Move to battery_charger.h
 #if 0
@@ -747,7 +748,11 @@ static void handle_notification(struct battery_chg_dev *bcdev, void *data,
 		 * unplugged).
 		 */
 		power_supply_changed(pst->psy);
-		pm_wakeup_dev_event(bcdev->dev, 50, true);
+		if (g_Charger_mode && notify_msg->notification == BC_USB_STATUS_GET) {
+			pm_wakeup_dev_event(bcdev->dev, 5000, true);
+		} else {
+			pm_wakeup_dev_event(bcdev->dev, 50, true);
+		}
 	}
 }
 

@@ -204,12 +204,16 @@ void Grip_Chip_IRQ_EN(bool flag){
 	}
 }
 void Grip_Driver_IRQ_EN(bool flag){
-	if(flag){
-		PRINT_INFO("Enable Driver IRQ");
-		enable_irq_wake(gpio_to_irq(snt8100fsr_g->hostirq_gpio));
-	}else{
-		PRINT_INFO("Disable Driver IRQ");
-		disable_irq_wake(gpio_to_irq(snt8100fsr_g->hostirq_gpio));
+	static bool irq_en = false;
+	if(irq_en != flag){
+		irq_en = flag;
+		if(irq_en == true){
+			PRINT_INFO("Enable Driver IRQ, %d", snt8100fsr_g->hostirq_gpio);
+			enable_irq(gpio_to_irq(snt8100fsr_g->hostirq_gpio));
+		}else{
+			PRINT_INFO("Disable Driver IRQ");
+			disable_irq_nosync(gpio_to_irq(snt8100fsr_g->hostirq_gpio));
+		}
 	}
 }
 
@@ -1790,6 +1794,29 @@ void grip_slideX_vibrator_enable_func(int val, int id){
 	PRINT_INFO("Write slide id=%d, val=%d", id, val);
 }
 
+void grip_slide_tap_priority_func(int slide_id, int val, uint16_t* reg){
+	if(grip_status_g->G_EN <= 0){
+		PRINT_INFO("Skip setting when grip off");
+		return;
+	}
+	MUTEX_LOCK(&snt8100fsr_g->ap_lock);
+	PRINT_DEBUG("val = %d", val);
+	grip_status_g->G_SLIDE_TAP_PRIORITY[slide_id] = val;
+	
+	if(Grip_Check_FW_Status()){return;}
+	
+	Wait_Wake_For_RegW();
+	val = val << 14;
+	*reg = (val & 0x4000) | (*reg & 0xBFFF);
+	set_slide_gesture(slide_id, *reg, 0);
+	mutex_unlock(&snt8100fsr_g->ap_lock);
+}
+
+void grip_slideX_tap_priority_func(int val, int id, uint16_t* reg_val){
+	grip_slide_tap_priority_func(id, val, reg_val);
+	PRINT_INFO("Write slide id=%d, val=%d, reg: %x", id, val, *reg_val);
+}
+
 void grip_slide_min_position_func(int slide_id, int val, uint16_t* reg){
 	if(grip_status_g->G_EN <= 0){
 		PRINT_INFO("Skip setting when grip off");
@@ -2040,7 +2067,6 @@ void grip_dump_status_func(struct work_struct *work){
 	}
 	mutex_unlock(&snt8100fsr_g->ap_lock);
 
-	Grip_Driver_IRQ_EN(1);
 	Wait_Wake_For_RegW();
 	
 	if(grip_status_g->G_EN > 0){
@@ -2455,7 +2481,6 @@ static long SntSensor_miscIoctl(struct file *file, unsigned int cmd, unsigned lo
 							goto end;
 			}
 			if(switch_en == 0 && g_snt_power_state == 1){
-				Grip_Driver_IRQ_EN(1);
 				Wait_Wake_For_RegW();
 			}
 			Power_Control(switch_en);
@@ -2682,7 +2707,6 @@ static ssize_t Grip_ReadK_proc_write(struct file *filp, const char __user *buff,
 		PRINT_INFO("Failed to enable vib trig2");
 	
 	MUTEX_LOCK(&snt8100fsr_g->ap_lock);
-	Grip_Driver_IRQ_EN(1);
 	Wait_Wake_For_RegW();
 	//Grip_Chip_IRQ_EN(1);
 		
@@ -4085,6 +4109,46 @@ void create_Grip_Slide_vib_en_proc_file(void)
 	return;
 }
 
+int Grip_Slide_tap_priority_proc_read(struct seq_file *buf, void *v)
+{
+	seq_printf(buf, "%d,%d,%d,%d\n", 
+		grip_status_g->G_SLIDE_TAP_PRIORITY[0],
+		grip_status_g->G_SLIDE_TAP_PRIORITY[1]);
+	return 0;
+}
+
+ssize_t Grip_Slide_tap_priority_proc_write(struct file *filp, const char __user *buff,
+		size_t len, loff_t *data)
+{
+	if(Grip_node_parse_string(buff, len, grip_status_g->G_SLIDE_TAP_PRIORITY) > 0)
+		grip_slideX_tap_priority_func(parse_result[1], parse_result[0], &SLIDE_BIT0[parse_result[0]]);
+	else
+		PRINT_DEBUG("Do Nothing");
+	return len;
+}
+
+int Grip_Slide_tap_priority_proc_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, Grip_Slide_tap_priority_proc_read, NULL);
+}
+
+void create_Grip_Slide_tap_priority_proc_file(void)
+{
+	static const struct file_operations proc_fops = {
+		.owner = THIS_MODULE,
+		.open = Grip_Slide_tap_priority_proc_open,
+		.write = Grip_Slide_tap_priority_proc_write,
+		.read = seq_read,
+		.release = single_release,
+	};
+	struct proc_dir_entry *proc_file = proc_create("driver/grip_slide_tap_priority", 0666, NULL, &proc_fops);
+
+	if (!proc_file) {
+		PRINT_CRIT("[Proc]%s failed!\n", __FUNCTION__);
+	}
+	return;
+}
+
 //============================================================
 //=======================SLIDE Part Done!!!==========================
 //============================================================
@@ -4352,7 +4416,6 @@ static int Grip_FW_VER_proc_read(struct seq_file *buf, void *v)
 	}
 	MUTEX_LOCK(&snt8100fsr_g->ap_lock);
 	if(snt8100fsr_g->grip_fw_loading_status == true){
-		Grip_Driver_IRQ_EN(1);
 		Wait_Wake_For_RegW();
 		//Grip_Chip_IRQ_EN(1);
 		
@@ -4559,7 +4622,6 @@ static int Grip_Cal_Read_proc_read(struct seq_file *buf, void *v)
 	}
 	MUTEX_LOCK(&snt8100fsr_g->ap_lock);
 	if(snt8100fsr_g->grip_fw_loading_status == true){
-		Grip_Driver_IRQ_EN(1);
 		Wait_Wake_For_RegW();
 		PRINT_INFO("call sleep1");
 		Grip_Read_Calibration_Data(buf,1);

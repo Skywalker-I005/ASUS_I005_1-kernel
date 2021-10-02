@@ -102,6 +102,10 @@
 #define FTX_MAX_COMPATIBLE_TYPE             4
 #define FTX_MAX_COMMMAND_LENGTH             16
 
+#define ASUS_TOUCH_X_POS                   7 // high 4 bits
+#define ASUS_TOUCH_Y_POS                   7 // low 4 bits
+#define ASUS_TOUCH_AREA_POS                  8 // FP area, high 4 bits
+#define ASUS_TOUCH_RATE_POS                  8 //report rate, low 4 bits
 
 /*****************************************************************************
 * Private enumerations, structures and unions using typedef

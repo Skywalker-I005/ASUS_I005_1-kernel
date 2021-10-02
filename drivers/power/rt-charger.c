@@ -103,6 +103,7 @@ struct rt1715_pdo_resp_msg {
 	u8	tcpc_pd_state;
 	u8	nr;
 	u32	pdos[PDO_MAX_NR];
+	u32	vid;
 };
 
 struct rt1715_vid_resp_msg {
@@ -430,6 +431,7 @@ void rt1715_pdo_notify(void) {
 	rt1715_pdo_msg.hdr.type = MSG_TYPE_RT_ADSP_NOTIFY;
 	rt1715_pdo_msg.hdr.opcode = MSG_OPCODE_RT_PDO;
 	rt1715_pdo_msg.tcpc_pd_state = tcpc_pd_state;
+	rt1715_pdo_msg.vid = vid_ext;
 
 	//pr_info("[USB] %s tcpc_pd_state = %d\n", __func__, tcpc_pd_state);
 	rc = rt1715_glink_write(g_info, &rt1715_pdo_msg, sizeof(rt1715_pdo_msg));

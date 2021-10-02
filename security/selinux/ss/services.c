@@ -2933,6 +2933,26 @@ int security_get_asus(struct selinux_state *s)
 	return security_get_ps(s,SAVELOG_DOMAIN);
 }
 
+#define SAVELOG_DOMAIN2 "savelogmtp2"
+int security_set_debug(struct selinux_state *s,int value)
+{
+	int rc = 0;
+
+	if(security_set_ps(s,SAVELOG_DOMAIN2, value)){
+		printk("SELinux: savelogmtp2 enable\n");
+		rc = 1;
+	}
+
+
+	return rc;
+}
+
+int security_get_debug(struct selinux_state *s)
+{
+	return security_get_ps(s,SAVELOG_DOMAIN2);
+}
+
+
 int security_get_bools(struct selinux_state *state,
 		       int *len, char ***names, int **values)
 {

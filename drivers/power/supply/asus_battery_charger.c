@@ -42,6 +42,8 @@ struct ADSP_ChargerPD_Info {
 	char firmware_version[128];
 	int batt_temp;
 	int fg_real_soc;
+	int cell1_voltage;
+	int cell2_voltage;
 };
 
 struct evtlog_context_resp_msg3 {
@@ -165,6 +167,10 @@ struct oem_get_fg_soc_req {
 	struct pmic_glink_hdr	hdr;
 };
 
+struct oem_get_cell_voltage_req {
+	struct pmic_glink_hdr	hdr;
+};
+
 struct oem_get_batt_temp_resp {
 	struct pmic_glink_hdr	hdr;
 	int    batt_temp;
@@ -173,6 +179,12 @@ struct oem_get_batt_temp_resp {
 struct oem_get_fg_soc_resp {
 	struct pmic_glink_hdr	hdr;
 	int    fg_soc;
+};
+
+struct oem_get_cell_voltage_resp {
+	struct pmic_glink_hdr	hdr;
+	u16    cell1_voltage;
+	u16    cell2_voltage;
 };
 
 struct oem_set_ASUS_media_req {
@@ -295,6 +307,7 @@ extern int asus_extcon_set_state_sync(struct extcon_dev *edev, int cable_state);
 #define OEM_GET_Batt_temp			0x3002
 #define OEM_GET_FG_SoC_REQ			0x3003
 #define OEM_SET_ASUS_media			0x3104
+#define OEM_GET_Cell_Voltage_REQ	0x3005
 //Define Message Type
 #define MSG_TYPE_REQ_RESP	1
 #define MSG_TYPE_NOTIFICATION	2
@@ -304,6 +317,8 @@ extern int asus_extcon_set_state_sync(struct extcon_dev *edev, int cable_state);
 #define SET_SIDE_THM_ALT_MODE	0x2
 #define SET_BTM_THM_ALT_MODE	0x4
 #define SET_BYPASS_CHG_MODE		0x8
+
+#define SET_18W_WA_MODE			0x20
 
 #define AUDIO_REQ_SET_LCM_MODE	0x100
 
@@ -340,6 +355,7 @@ struct delayed_work	asus_set_qc_state_work;
 #define Side_Port_Asus_VID 103
 bool g_ADAPTER_ID = 0;
 extern bool g_Charger_mode;
+bool g_IsBootComplete = 0;
 
 extern struct battery_chg_dev *g_bcdev;
 struct power_supply *qti_phy_usb;
@@ -475,6 +491,7 @@ void static create_uts_status_proc_file(void)
 void usbin_suspend_to_ADSP(int enable);
 void write_CHGLimit_value(int input);
 void get_oem_batt_temp_from_ADSP(void);
+void get_oem_cell_volt_from_ADSP(void);
 
 //[+++] Add thermal alert adc function
 bool usb_alert_side_flag = 0;
@@ -495,6 +512,7 @@ struct notifier_block host_notify;
 struct iio_channel *side_usb_temp_vadc_chan;
 struct iio_channel *btm_usb_temp_vadc_chan;
 struct delayed_work	asus_min_check_work;
+struct delayed_work	asus_18W_workaround_work;
 //[+++] Add thermal alert adc function
 
 //[+++]Add log to show charging status in ASUSEvtlog.txt
@@ -585,7 +603,7 @@ void asus_set_ASUS_media_worker(struct work_struct *work)
 	struct oem_set_ASUS_media_req req_msg = { { 0 } };
 	int rc;
 
-	pr_err("g_ASUS_Media= %d\n", g_ASUS_Media);
+	pr_err("asuslib g_ASUS_Media= %d\n", g_ASUS_Media);
 	req_msg.hdr.owner = PMIC_GLINK_MSG_OWNER_OEM;
 	req_msg.hdr.type = MSG_TYPE_REQ_RESP;
 	req_msg.hdr.opcode = OEM_SET_ASUS_media;
@@ -640,6 +658,8 @@ void asus_set_panelonoff_current_worker(struct work_struct *work)
 		asus_set_panelonoff_charging_current_limit(true);
 	} else if (g_drm_blank == DRM_PANEL_BLANK_POWERDOWN) {
 		asus_set_panelonoff_charging_current_limit(false);
+	} else if (g_drm_blank == DRM_PANEL_BLANK_LP) {
+		asus_set_panelonoff_charging_current_limit(false);
 	}
 }
 
@@ -665,25 +685,25 @@ static int drm_notifier_callback(struct notifier_block *self,
 
 	switch (*blank) {
 	case DRM_PANEL_BLANK_UNBLANK:
-		printk("[BAT][CHG] DRM_PANEL_BLANK_UNBLANK,Display on");
-		if (DRM_PANEL_EARLY_EVENT_BLANK == event) {
-			//pr_debug("resume: event = %lu, not care", event);
-		} else if (DRM_PANEL_EVENT_BLANK == event) {
+		if (DRM_PANEL_EVENT_BLANK == event) {
+			printk("[BAT][CHG] DRM_PANEL_BLANK_UNBLANK,Display on");
 			printk("[BAT][CHG] asus_set_panelonoff_charging_current_limit = true");
 			schedule_delayed_work(&asus_set_panelonoff_current_work, 0);
 		}
 		break;
 	case DRM_PANEL_BLANK_POWERDOWN:
-		printk("[BAT][CHG] DRM_PANEL_BLANK_POWERDOWN,Display off");
-		if (DRM_PANEL_EARLY_EVENT_BLANK == event) {
-			;
-		} else if (DRM_PANEL_EVENT_BLANK == event) {
+		if (DRM_PANEL_EVENT_BLANK == event) {
+			printk("[BAT][CHG] DRM_PANEL_BLANK_POWERDOWN,Display off");
 			printk("[BAT][CHG] asus_set_panelonoff_charging_current_limit = false");
 			schedule_delayed_work(&asus_set_panelonoff_current_work, 0);
 		}
 		break;
 	case DRM_PANEL_BLANK_LP:
-		printk("[BAT][CHG] DRM_PANEL_BLANK_LP,Display resume into LP1/LP2");
+		if (DRM_PANEL_EVENT_BLANK == event) {
+			printk("[BAT][CHG] DRM_PANEL_BLANK_LP,Display resume into LP1/LP2");
+			printk("[BAT][CHG] asus_set_panelonoff_charging_current_limit = false");
+			schedule_delayed_work(&asus_set_panelonoff_current_work, 0);
+		}
 		break;
 	case DRM_PANEL_BLANK_FPS_CHANGE:
 		break;
@@ -898,6 +918,26 @@ static ssize_t asus_get_FG_SoC_show(struct class *c,
 	return scnprintf(buf, PAGE_SIZE, "%d\n", ChgPD_Info.fg_real_soc);
 }
 static CLASS_ATTR_RO(asus_get_FG_SoC);
+
+static ssize_t asus_get_cell_voltage_show(struct class *c,
+					struct class_attribute *attr, char *buf)
+{
+	struct oem_get_cell_voltage_req req_msg = {};
+	int rc;
+
+	req_msg.hdr.owner = PMIC_GLINK_MSG_OWNER_OEM;
+	req_msg.hdr.type = MSG_TYPE_REQ_RESP;
+	req_msg.hdr.opcode = OEM_GET_Cell_Voltage_REQ;
+
+	rc = battery_chg_write(g_bcdev, &req_msg, sizeof(req_msg));
+	if (rc < 0) {
+		pr_err("Failed to get battery cell voltage rc=%d\n", rc);
+		return rc;
+	}
+
+	return scnprintf(buf, PAGE_SIZE, "cell1 voltage=%d, cell2 voltage=%d\n", ChgPD_Info.cell1_voltage, ChgPD_Info.cell2_voltage);
+}
+static CLASS_ATTR_RO(asus_get_cell_voltage);
 //[---] Addd the interface for accessing the BATTERY power supply
 
 //[+++] Add the interface for accesing the inforamtion of ChargerPD on ADSP
@@ -1652,10 +1692,35 @@ static ssize_t cn_demo_app_show(struct class *c,
 }
 static CLASS_ATTR_RW(cn_demo_app);
 
+static ssize_t boot_completed_store(struct class *c,
+					struct class_attribute *attr,
+					const char *buf, size_t count)
+{
+	int tmp = 0;
+
+	tmp = simple_strtol(buf, NULL, 10);
+
+	g_IsBootComplete = tmp;
+	CHG_DBG("%s: g_IsBootComplete : %d, g_ADAPTER_ID : %d\n", __func__, g_IsBootComplete, g_ADAPTER_ID);
+	msleep(10);
+	if (g_ADAPTER_ID == true)
+		asus_extcon_set_state_sync(quickchg_extcon, Side_Port_Asus_VID);
+
+	return count;
+}
+static ssize_t boot_completed_show(struct class *c,
+					struct class_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", g_IsBootComplete);
+}
+static CLASS_ATTR_RW(boot_completed);
+EXPORT_SYMBOL(g_IsBootComplete);
+
 static struct attribute *asuslib_class_attrs[] = {
 	&class_attr_BTM_OTG_EN1.attr,
 	&class_attr_pmi_mux_en.attr,
 	&class_attr_asus_get_FG_SoC.attr,
+	&class_attr_asus_get_cell_voltage.attr,
 	&class_attr_asus_get_PlatformID.attr,
 	&class_attr_asus_get_BattID.attr,
 	&class_attr_POGO_OTG_EN.attr,
@@ -1683,6 +1748,7 @@ static struct attribute *asuslib_class_attrs[] = {
 	&class_attr_demo_app_property.attr,
 	&class_attr_cn_demo_app.attr,
 	&class_attr_bypass_stop_charging.attr,
+	&class_attr_boot_completed.attr,
 	NULL,
 };
 ATTRIBUTE_GROUPS(asuslib_class);
@@ -1861,11 +1927,13 @@ static void handle_notification(struct battery_chg_dev *bcdev, void *data,
             if (Update_adapter_id_msg->adapter_id != pre_adapter_id) {
                 if (Update_adapter_id_msg->adapter_id == 0x0b05) {
                     CHG_DBG("%s. Set VID quickchg_extcon state: 103\n", __func__);
-                    asus_extcon_set_state_sync(quickchg_extcon, Side_Port_Asus_VID);
+                    if (g_IsBootComplete == 1)
+                        asus_extcon_set_state_sync(quickchg_extcon, Side_Port_Asus_VID);
                     g_ADAPTER_ID = true;
                 } else {
                     CHG_DBG("%s. Set VID quickchg_extcon state: 102\n", __func__);
-                    asus_extcon_set_state_sync(quickchg_extcon, Side_Port_Not_Asus_VID_or_No_charger);
+                    if (g_IsBootComplete == 1)
+                        asus_extcon_set_state_sync(quickchg_extcon, Side_Port_Not_Asus_VID_or_No_charger);
                     g_ADAPTER_ID = false;
                 }
 
@@ -1910,6 +1978,7 @@ static void handle_message(struct battery_chg_dev *bcdev, void *data,
 	struct oem_get_FW_version_resp *fw_version_msg;
 	struct oem_get_batt_temp_resp *batt_temp_msg;
 	struct oem_get_fg_soc_resp *fg_soc_msg;
+	struct oem_get_cell_voltage_resp *cell_voltage_msg;
 	struct oem_set_ASUS_media_req *set_asus_media_msg;
 	struct oem_get_cc_status_msg *get_cc_status_msg;
 
@@ -1969,6 +2038,17 @@ static void handle_message(struct battery_chg_dev *bcdev, void *data,
 			ack_set = true;
 		} else {
 			pr_err("Incorrect response length %zu for asus_batt_temp\n",
+				len);
+		}
+		break;
+	case OEM_GET_Cell_Voltage_REQ:
+		if (len == sizeof(*cell_voltage_msg)) {
+			cell_voltage_msg = data;
+			ChgPD_Info.cell1_voltage = cell_voltage_msg->cell1_voltage;
+			ChgPD_Info.cell2_voltage = cell_voltage_msg->cell2_voltage;
+			ack_set = true;
+		} else {
+			pr_err("Incorrect response length %zu for asus_get_cell_voltage\n",
 				len);
 		}
 		break;
@@ -2264,6 +2344,7 @@ int asus_set_vbus_attached_status(int value) {
 		g_vbus_plug = 1;
 		ASUSEvtlog("[BAT][Ser]Cable Plug-in");
 		schedule_delayed_work(&asus_min_check_work, 0);
+		schedule_delayed_work(&asus_18W_workaround_work, msecs_to_jiffies(10000));
 	} else {
 		g_vbus_plug = 0;
 		ASUSEvtlog("[BAT][Ser]Cable Plug-out");
@@ -2281,6 +2362,7 @@ int asus_set_vbus_attached_status(int value) {
 
 		alarm_cancel(&bat_alarm);
 		cancel_delayed_work(&asus_min_check_work);
+		cancel_delayed_work(&asus_18W_workaround_work);
 		wake_unlock(&cable_resume_wake_lock);
 	}
 	CHG_DBG("%s: g_vbus_plug : %d \n", __func__, g_vbus_plug);
@@ -2294,8 +2376,11 @@ static enum alarmtimer_restart batAlarm_handler(struct alarm *alarm, ktime_t now
 	return ALARMTIMER_NORESTART;
 }
 
-int g_temp_THR = 70000;
-int g_recovery_temp_THR = 60000;
+int g_temp_THR_SIDE = 85000;
+int g_recovery_temp_THR_SIDE = 75000;
+int g_temp_THR_BTM = 70000;
+int g_recovery_temp_THR_BTM = 60000;
+
 int asus_thermal_side(void)
 {
 	int rc;
@@ -2312,11 +2397,11 @@ int asus_thermal_side(void)
 	else
 		CHG_DBG("%s: side_adc_temp = %d\n", __func__, adc_temp);
 
-	if (adc_temp > g_temp_THR && !usb_alert_side_flag) {
+	if (adc_temp > g_temp_THR_SIDE && !usb_alert_side_flag) {
 		usb_alert_side_flag = 1;
 		g_once_usb_thermal_side = 1;
 		//asus_set_charger_limit_mode(SET_SIDE_THM_ALT_MODE, 1);
-	} else if (adc_temp < g_recovery_temp_THR && usb_alert_side_flag) {
+	} else if (adc_temp < g_recovery_temp_THR_SIDE && usb_alert_side_flag) {
 		usb_alert_side_flag = 0;
 		//asus_set_charger_limit_mode(SET_SIDE_THM_ALT_MODE, 0);
 	}
@@ -2339,11 +2424,11 @@ int asus_thermal_btm(void)
 	else
 		CHG_DBG("%s: btm_adc_temp = %d\n", __func__, adc_temp);
 
-	if (adc_temp > g_temp_THR && !usb_alert_btm_flag) {
+	if (adc_temp > g_temp_THR_BTM && !usb_alert_btm_flag) {
 		usb_alert_btm_flag = 1;
 		g_once_usb_thermal_btm = 1;
 		//asus_set_charger_limit_mode(SET_BTM_THM_ALT_MODE, 1);
-	} else if (adc_temp < g_recovery_temp_THR && usb_alert_btm_flag) {
+	} else if (adc_temp < g_recovery_temp_THR_BTM && usb_alert_btm_flag) {
 		usb_alert_btm_flag = 0;
 		//asus_set_charger_limit_mode(SET_BTM_THM_ALT_MODE, 0);
 	}
@@ -2599,6 +2684,16 @@ void asus_min_check_worker(struct work_struct *work)
 	pm_relax(g_bcdev->dev);
 }
 
+void asus_18W_workaround_worker(struct work_struct *work)
+{
+	int rc = 0;
+
+	CHG_DBG("%s.\n", __func__);
+	rc = asus_set_charger_limit_mode(SET_18W_WA_MODE, 0);
+	if (rc < 0)
+		CHG_DBG_E("%s: Failed to set asus_set_charger_limit_mode, rc=%d\n", __func__, rc);
+}
+
 #if 0
 static int charge_notifier_callback(struct notifier_block *self,
                                  unsigned long event, void *data)
@@ -2749,58 +2844,68 @@ static int print_battery_status(void)
 	union power_supply_propval prop = {};
 	int rc = 0;
 	char battInfo[256];
-	int bat_cap = 0, bat_fcc = 0, bat_vol = 0, bat_cur = 0, bat_temp = 0, chg_sts = 0, bat_health = 0;
+	int bat_cap = 0, bat_fcc = 0, bat_vol = 0, bat_cur = 0, bat_temp = 0, chg_sts = 0, bat_health = 0, charge_counter = 0;
 	char UTSInfo[256]; //ASUS_BSP add to printk the WIFI hotspot & QXDM UTS event
 
 	get_oem_batt_temp_from_ADSP();
+	get_oem_cell_volt_from_ADSP();
 
 	rc = power_supply_get_property(qti_phy_bat, POWER_SUPPLY_PROP_CAPACITY, &prop);
 	if (rc < 0)
-		CHG_DBG_E("%s: Failed to get POWER_SUPPLY_PROP_CAPACITY, rc=%d\n", rc);
+		CHG_DBG_E("%s: Failed to get POWER_SUPPLY_PROP_CAPACITY, rc=%d\n", __func__, rc);
 	else
 		bat_cap = prop.intval;
 
 	rc = power_supply_get_property(qti_phy_bat, POWER_SUPPLY_PROP_CHARGE_FULL, &prop);
 	if (rc < 0)
-		CHG_DBG_E("%s: Failed to get POWER_SUPPLY_PROP_CHARGE_FULL, rc=%d\n", rc);
+		CHG_DBG_E("%s: Failed to get POWER_SUPPLY_PROP_CHARGE_FULL, rc=%d\n", __func__, rc);
 	else
 		bat_fcc = prop.intval;
 
 	rc = power_supply_get_property(qti_phy_bat, POWER_SUPPLY_PROP_VOLTAGE_NOW, &prop);
 	if (rc < 0)
-		CHG_DBG_E("%s: Failed to get POWER_SUPPLY_PROP_VOLTAGE_NOW, rc=%d\n", rc);
+		CHG_DBG_E("%s: Failed to get POWER_SUPPLY_PROP_VOLTAGE_NOW, rc=%d\n", __func__, rc);
 	else
 		bat_vol = prop.intval;
 
 	rc = power_supply_get_property(qti_phy_bat, POWER_SUPPLY_PROP_CURRENT_NOW, &prop);
 	if (rc < 0)
-		CHG_DBG_E("%s: Failed to get POWER_SUPPLY_PROP_CURRENT_NOW, rc=%d\n", rc);
+		CHG_DBG_E("%s: Failed to get POWER_SUPPLY_PROP_CURRENT_NOW, rc=%d\n", __func__, rc);
 	else
 		bat_cur = prop.intval;
 
 	rc = power_supply_get_property(qti_phy_bat, POWER_SUPPLY_PROP_TEMP, &prop);
 	if (rc < 0)
-		CHG_DBG_E("%s: Failed to get POWER_SUPPLY_PROP_TEMP, rc=%d\n", rc);
+		CHG_DBG_E("%s: Failed to get POWER_SUPPLY_PROP_TEMP, rc=%d\n", __func__, rc);
 	else
 		bat_temp = prop.intval;
 
 	rc = power_supply_get_property(qti_phy_bat, POWER_SUPPLY_PROP_STATUS, &prop);
 	if (rc < 0)
-		CHG_DBG_E("%s: Failed to get POWER_SUPPLY_PROP_STATUS, rc=%d\n", rc);
+		CHG_DBG_E("%s: Failed to get POWER_SUPPLY_PROP_STATUS, rc=%d\n", __func__, rc);
 	else
 		chg_sts = prop.intval;
 
 	rc = power_supply_get_property(qti_phy_bat, POWER_SUPPLY_PROP_HEALTH, &prop);
 	if (rc < 0)
-		CHG_DBG_E("%s: Failed to get POWER_SUPPLY_PROP_HEALTH, rc=%d\n", rc);
+		CHG_DBG_E("%s: Failed to get POWER_SUPPLY_PROP_HEALTH, rc=%d\n", __func__, rc);
 	else
 		bat_health = prop.intval;
 
-	snprintf(battInfo, sizeof(battInfo), "report Capacity ==>%d, FCC:%dmAh, BMS:%d, V:%dmV, Cur:%dmA, ",
+	rc = power_supply_get_property(qti_phy_bat, POWER_SUPPLY_PROP_CHARGE_COUNTER, &prop);
+	if (rc < 0)
+		CHG_DBG_E("%s: Failed to get POWER_SUPPLY_PROP_CHARGE_COUNTER, rc=%d\n", __func__, rc);
+	else
+		charge_counter = prop.intval;
+
+	snprintf(battInfo, sizeof(battInfo), "report Capacity ==>%d, FCC:%dmAh, RM:%dmAh, BMS:%d, V:%dmV, Vcell1:%dmV, Vcell2_V:%dmV, Cur:%dmA, ",
 		bat_cap,
 		bat_fcc/1000,
+		charge_counter/1000,
 		bat_cap,
 		bat_vol/1000,
+		ChgPD_Info.cell1_voltage,
+		ChgPD_Info.cell2_voltage,
 		bat_cur/1000);
 	snprintf(battInfo, sizeof(battInfo), "%sgaugeTemp:%d.%dC, pmicTemp:%dC, BATID:%d, CHG_Status:%d(%s), QC_Extcon:%d(%s), BAT_HEALTH:%s\n",
 		battInfo,
@@ -2912,6 +3017,22 @@ void get_oem_batt_temp_from_ADSP(void)
 	}
 }
 
+void get_oem_cell_volt_from_ADSP(void)
+{
+	struct oem_get_cell_voltage_req req_msg = {};
+	int rc;
+
+	req_msg.hdr.owner = PMIC_GLINK_MSG_OWNER_OEM;
+	req_msg.hdr.type = MSG_TYPE_REQ_RESP;
+	req_msg.hdr.opcode = OEM_GET_Cell_Voltage_REQ;
+
+	rc = battery_chg_write(g_bcdev, &req_msg, sizeof(req_msg));
+	if (rc < 0) {
+		pr_err("Failed to get battery cell voltage rc=%d\n", rc);
+		return;
+	}
+}
+
 /* +++ Add Maximun Battery Lifespan +++ */
 #define CHG_LIMIT_PATH	"/asdf/CHGLimit"
 void write_CHGLimit_value(int input)
@@ -3005,6 +3126,7 @@ int asuslib_init(void) {
 
 	alarm_init(&bat_alarm, ALARM_REALTIME, batAlarm_handler);
 	INIT_DELAYED_WORK(&asus_min_check_work, asus_min_check_worker);
+	INIT_DELAYED_WORK(&asus_18W_workaround_work, asus_18W_workaround_worker);
 
 #if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT
 	msm_dwc3_register_switch(&dwc3_role_switch);
@@ -3139,7 +3261,7 @@ int asuslib_init(void) {
 	schedule_delayed_work(&asus_update_batt_status_work, msecs_to_jiffies(5000));
 
 	INIT_DELAYED_WORK(&asus_set_ASUS_media_work, asus_set_ASUS_media_worker);
-	schedule_delayed_work(&asus_set_ASUS_media_work, msecs_to_jiffies(6000));
+	schedule_delayed_work(&asus_set_ASUS_media_work, 0);
 
 	create_uts_status_proc_file(); //ASUS_BSP LiJen add to printk the WIFI hotspot & QXDM UTS event
 

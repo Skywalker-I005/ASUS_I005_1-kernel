@@ -89,10 +89,13 @@ extern bool g_skip_ss_lanes;
 //For drm panel notify
 static struct drm_panel *active_panel;
 struct notifier_block display_notifier;
+struct delayed_work	check_pogo_id_work;
+struct delayed_work	enable_regulator_work;
 struct delayed_work	ec_hid_set_drm_work;
 struct regulator *regulator_vdd;
 
 bool regulator_enabled = false;
+struct mutex regulator_mutex;
 
 //extern bool g_station_sleep;
 //extern int lid_status;
@@ -422,13 +425,13 @@ int dongle_type_detect(enum asus_dongle_type *type)
 	}
 	
 	mutex_lock( &g_hid_data->pogo_id_mutex);
-
+	printk("[EC_HID] pogo_id_mutex lock!!!\n");
 	retval = iio_read_channel_processed(pogo_id_adc_chan,&pogo_id_voltage);
 	if(retval < 0)
 		printk("[EC_HID] iio_read_channel_processed fail.\n");
 		
 	mutex_unlock(&g_hid_data->pogo_id_mutex);
-
+	printk("[EC_HID] pogo_id_mutex unlock!!!\n");
 	printk("[EC_HID] pogo_id_adc is %d.\n",pogo_id_voltage);
 	
 	g_pogo_id_voltage = pogo_id_voltage;
@@ -437,7 +440,7 @@ int dongle_type_detect(enum asus_dongle_type *type)
 	{
 		*type = Dongle_NO_INSERT;
 	}
-	else if( 620000 <= pogo_id_voltage && pogo_id_voltage <= 780000) 
+	else if( 620000 <= pogo_id_voltage && pogo_id_voltage <= 900000) 
 	{
 		*type = Dongle_INBOX5;
 	}
@@ -514,29 +517,16 @@ void update_POGO_ID_ADC_Threshold(enum asus_dongle_type type)
 	}
 }
 
-static void qpnp_pogo_id_adc_notification(enum adc_tm_state state,void *ctx)
+void enable_regulator_worker(struct work_struct *work)
 {
-	enum asus_dongle_type type = 255;
 	int ret;
 	
-	printk("[EC_HID] : state is %d!\n",state);
-	
-	dongle_type_detect(&type);
-	
-	if(type == Dongle_ERROR|| type == Dongle_Others)
-	{
-		msleep(100);
-		dongle_type_detect(&type);
-	}
-	
-	update_POGO_ID_ADC_Threshold(type);
-	
-	control_pogo_det(type);
-
-	if (type == Dongle_BackCover) {
+	mutex_lock(&regulator_mutex);
+	printk("[EC_HID] regulator_mutex lock!!!\n");
+	if (gDongleType == Dongle_BackCover) {
 		if (!regulator_enabled) {
 			printk("[EC_HID] enable usb2_mux2_en regulator\n");
-			
+		
 			ret = regulator_set_voltage(regulator_vdd, 3000000, 3300000);
 			if (ret < 0)
 				printk("[EC_HID] Failed to set regulator voltage\n");
@@ -561,22 +551,68 @@ static void qpnp_pogo_id_adc_notification(enum adc_tm_state state,void *ctx)
 			regulator_enabled = false;
 		}
 	}
-	
-	if (type == Dongle_INBOX5) {
+	mutex_unlock(&regulator_mutex);
+printk("[EC_HID] regulator_mutex unlock!!!\n");
+	if (gDongleType == Dongle_INBOX5) {
 		ret = gpio_direction_output(g_hid_data->usb2_mux2_en, 0);
 		if (ret)
 			printk("[EC_HID] usb2_mux2_en output low, err %d\n", ret);
 	}
-	else if (type == Dongle_BackCover) {
+	else if (gDongleType == Dongle_BackCover) {
 		ret = gpio_direction_output(g_hid_data->usb2_mux2_en, 1);
 		if (ret)
 			printk("[EC_HID] usb2_mux2_en output high, err %d\n", ret);
 	}
 		
-
 	blocking_notifier_call_chain(&ec_hid_event_header,gDongleType,NULL);
 	
 	ec_hid_uevent();
+}
+
+enum asus_dongle_type pre_dongletype = 255;
+void check_pogo_id_worker(struct work_struct *work)
+{
+	enum asus_dongle_type type = 255;
+	int i;
+	
+	for (i=0; i<5; i++) {
+		dongle_type_detect(&type);
+	
+		if (type == pre_dongletype) {
+			break;
+		}
+		else {
+			if (i == 4) {
+				update_POGO_ID_ADC_Threshold(type);
+				gDongleType = Dongle_NO_INSERT;
+				return;
+			}
+
+			pre_dongletype = type;
+			msleep(100);
+		}
+	}
+	
+	msleep(10);
+	update_POGO_ID_ADC_Threshold(type);
+
+	control_pogo_det(type);
+
+	schedule_delayed_work(&enable_regulator_work, 0);
+}
+
+static void qpnp_pogo_id_adc_notification(enum adc_tm_state state,void *ctx)
+{
+	printk("[EC_HID]: qpnp_pogo_id_adc_notification state is %d!\n",state);
+	
+	dongle_type_detect(&pre_dongletype);
+
+	mutex_lock( &g_hid_data->pogo_id_mutex);
+	printk("[EC_HID] pogo_id_mutex lock!!!\n");
+	cancel_delayed_work_sync(&check_pogo_id_work);
+	mutex_unlock( &g_hid_data->pogo_id_mutex);
+	printk("[EC_HID] pogo_id_mutex unlock!!!\n");
+	schedule_delayed_work(&check_pogo_id_work, msecs_to_jiffies(100));
 }
 
 int asus_wait4hid (void)
@@ -1227,12 +1263,15 @@ static int ec_hid_probe(struct platform_device *pdev)
 	mutex_init(&ec_hid_device->report_mutex);
 	mutex_init(&ec_hid_device->pogo_id_mutex);
 	mutex_init(&ec_i2c_func_mutex);
+	mutex_init(&regulator_mutex);
     sema_init(&ec_hid_device->pogo_sema, 1);
 
 	ec_hid_device->lock = false;
 	ec_hid_device->dev = &pdev->dev;
 	g_hid_data = ec_hid_device;
 
+	INIT_DELAYED_WORK(&check_pogo_id_work, check_pogo_id_worker);
+	INIT_DELAYED_WORK(&enable_regulator_work, enable_regulator_worker);
 	INIT_DELAYED_WORK(&ec_hid_set_drm_work, ec_hid_set_drm_worker);
 	schedule_delayed_work(&ec_hid_set_drm_work, msecs_to_jiffies(8000));
 	

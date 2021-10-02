@@ -31,6 +31,7 @@
 #include <linux/of.h>
 #include <asm/current.h>
 #include <linux/timer.h>
+#include <linux/qcom_scm.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/trace_msm_ssr_event.h>
@@ -158,6 +159,7 @@ struct restart_log {
 	struct subsys_device *dev;
 	struct list_head list;
 };
+extern enum qcom_download_mode download_mode_adsp;//ASUS_BSP : Add for ADSP subsystem restart use
 
 /**
  * struct subsys_device - subsystem device
@@ -1205,6 +1207,13 @@ int subsystem_restart_dev(struct subsys_device *dev)
 		printk("ssr adsp, force to related ssr");
 		dev->restart_level  = RESET_SUBSYS_COUPLED;
 	}
+	//[+++]ASUS_BSP : Enable Full RAMDUMP for ADSP analysis if QPST download is enabled
+	if (strcmp(name, "adsp") == 0 && download_mode_adsp == QCOM_DOWNLOAD_FULLDUMP)
+	{
+		printk("ssr adsp, force to enter full ramdump");
+		dev->restart_level  = RESET_SOC;
+	}
+	//[---]ASUS_BSP : Enable Full RAMDUMP for ADSP analysis if QPST download is enabled
 
 	switch (dev->restart_level) {
 

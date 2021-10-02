@@ -80,7 +80,7 @@
 struct fts_ts_data *fts_data;
 bool tp3518u = false;
 //fod
-static int fts_fp_position[4] = {440,640, 1774, 1974};
+static int fts_fp_position[4] = {7040,10240, 28384, 31584};
 static int *fp_position = NULL;
 int fp_key_i= -1;
 int fp_press = 0; // 0 : up , 1 : O , 2 : F
@@ -805,7 +805,6 @@ static int fts_read_parse_touchdata(struct fts_ts_data *data)
     }
     data->point_num = buf[FTS_TOUCH_POINT_NUM] & 0x0F;
     data->touch_point = 0;
-
     if (data->ic_info.is_incell) {
         if ((data->point_num == 0x0F) && (buf[2] == 0xFF) && (buf[3] == 0xFF)
             && (buf[4] == 0xFF) && (buf[5] == 0xFF) && (buf[6] == 0xFF)) {
@@ -825,7 +824,6 @@ static int fts_read_parse_touchdata(struct fts_ts_data *data)
     for (i = 0; i < max_touch_num; i++) {
         base = FTS_ONE_TCH_LEN * i;
         pointid = (buf[FTS_TOUCH_ID_POS + base]) >> 4;
-
 	if (pointid >= FTS_MAX_ID)
             break;
 	else if (pointid >= max_touch_num) {
@@ -835,14 +833,16 @@ static int fts_read_parse_touchdata(struct fts_ts_data *data)
 
         data->touch_point++;
 	
-        events[i].x = ((buf[FTS_TOUCH_X_H_POS + base] & 0x0F) << 8) +
-                      (buf[FTS_TOUCH_X_L_POS + base] & 0xFF);
-        events[i].y = ((buf[FTS_TOUCH_Y_H_POS + base] & 0x0F) << 8) +
-                      (buf[FTS_TOUCH_Y_L_POS + base] & 0xFF);    
+        events[i].x = ((buf[ASUS_TOUCH_X_1_POS + base] & 0x0F) << 12) +
+                      ((buf[ASUS_TOUCH_X_2_POS + base] & 0xFF) << 4) + 
+                      (buf[ASUS_TOUCH_X_3_POS + base] >> 4);
+        events[i].y = ((buf[ASUS_TOUCH_Y_1_POS + base] & 0x0F) << 12) +
+                      ((buf[ASUS_TOUCH_Y_2_POS + base] & 0xFF) << 4) +
+		      (buf[ASUS_TOUCH_Y_3_POS + base] & 0x0F) ;    
         events[i].flag = buf[FTS_TOUCH_EVENT_POS + base] >> 6;
         events[i].id = buf[FTS_TOUCH_ID_POS + base] >> 4;
-        events[i].p =  buf[FTS_TOUCH_PRE_POS + base]; // FP area
-        events[i].rate =  buf[FTS_TOUCH_AREA_POS + base]; //report rate
+        events[i].p = buf[ASUS_TOUCH_AREA_POS + base] >> 4; // FP area
+        events[i].rate = buf[ASUS_TOUCH_RATE_POS + base] & 0x0F; //report rate
         if (data->realtime == 1) { 
         switch (events[i].rate) {
 	  case 9 :
@@ -1432,8 +1432,8 @@ static int fts_get_dt_coords(struct device *dev, char *name,
     } else {
         pdata->x_min = coords[0];
         pdata->y_min = coords[1];
-        pdata->x_max = coords[2];
-        pdata->y_max = coords[3];
+        pdata->x_max = coords[2]*16 - 1;
+        pdata->y_max = coords[3]*16 - 1;
     }
 
     FTS_INFO("display x(%d %d) y(%d %d)", pdata->x_min, pdata->x_max,
@@ -2051,6 +2051,8 @@ static int fts_ts_suspend(struct device *dev)
     struct fts_ts_data *ts_data = fts_data;
     int gesture_suspend_ok = 0;
     int enter_gesture_mode = 0;
+    u8 reg_e5 = 0;
+    u8 reg_e6 = 0;
     
     FTS_FUNC_ENTER();
     if (ts_data->suspended) {
@@ -2063,6 +2065,10 @@ static int fts_ts_suspend(struct device *dev)
         return 0;
     }
 
+    fts_read_reg(FTS_REG_PALM, &reg_e5);
+    fts_read_reg(FTS_REG_ILLEGAL_GESTURE, &reg_e6);
+    FTS_INFO("Read reg status before suspend E5 0x%X E6 0x%X ",reg_e5,reg_e6);
+    
 #if FTS_ESDCHECK_EN
     fts_esdcheck_suspend();
 #endif
@@ -2107,6 +2113,7 @@ static int fts_ts_resume(struct device *dev)
 {
     struct fts_ts_data *ts_data = fts_data;
     int enter_gesture_mode = 0;
+    u8 reg_e6 = 0;
     
     FTS_FUNC_ENTER();
     if (!ts_data->suspended) {
@@ -2117,6 +2124,8 @@ static int fts_ts_resume(struct device *dev)
     enter_gesture_mode = is_enter_gesture_mode(ts_data);
     FTS_INFO("Is enter gesture mode %d",enter_gesture_mode);   
     if (ts_data->gesture_mode && (enter_gesture_mode == 1)) {
+	fts_read_reg(FTS_REG_ILLEGAL_GESTURE, &reg_e6);
+	FTS_INFO("Read reg status before gesture resume E6 0x%X ",reg_e6);
         fts_gesture_resume(ts_data);
     }
     

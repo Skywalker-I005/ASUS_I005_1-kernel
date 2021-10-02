@@ -86,7 +86,8 @@
 *****************************************************************************/
 struct fts_ts_data *fts_data;
 bool tpasus = false;
-
+int asus_x = 0;
+int asus_y = 0;
 #if defined(CONFIG_DRM)
 static struct drm_panel *active_panel;
 #endif
@@ -1528,7 +1529,15 @@ static int fts_read_parse_touchdata(struct fts_ts_data *data)
 		events[i].id = buf[FTS_TOUCH_ID_POS + base] >> 4;
 		events[i].area = buf[FTS_TOUCH_AREA_POS + base] >> 4;
 		events[i].p =  buf[FTS_TOUCH_PRE_POS + base];
-
+		if (tpasus) {
+		    events[i].x = ((buf[FTS_TOUCH_X_H_POS + base] & 0x0F) << 12) +
+				  ((buf[FTS_TOUCH_X_L_POS + base] & 0xFF) << 4) + 
+				  (buf[ASUS_TOUCH_X_POS + base] >> 4);
+		    events[i].y = ((buf[FTS_TOUCH_Y_H_POS + base] & 0x0F) << 12) +
+				  ((buf[FTS_TOUCH_Y_L_POS + base] & 0xFF))+
+				  (buf[ASUS_TOUCH_Y_POS + base] & 0x0F) ;    
+		    events[i].area = buf[ASUS_TOUCH_AREA_POS + base] >> 4;
+		}
 		if (EVENT_DOWN(events[i].flag) && (data->point_num == 0)) {
 			FTS_INFO("abnormal touch data from fw");
 			return -EIO;
@@ -1659,6 +1668,12 @@ static int fts_input_init(struct fts_ts_data *ts_data)
 #endif
 	input_set_abs_params(input_dev, ABS_MT_POSITION_X, pdata->x_min, pdata->x_max, 0, 0);
 	input_set_abs_params(input_dev, ABS_MT_POSITION_Y, pdata->y_min, pdata->y_max, 0, 0);
+	if (tpasus) {
+	    asus_x = pdata->x_max*16 - 1;
+	    asus_y = pdata->y_max*16 - 1;  
+	    input_set_abs_params(input_dev, ABS_MT_POSITION_X, pdata->x_min, asus_x, 0, 0);
+	    input_set_abs_params(input_dev, ABS_MT_POSITION_Y, pdata->y_min, asus_y, 0, 0);	  
+	}
 	input_set_abs_params(input_dev, ABS_MT_TOUCH_MAJOR, 0, 0xFF, 0, 0);
 #if FTS_REPORT_PRESSURE_EN
 	input_set_abs_params(input_dev, ABS_MT_PRESSURE, 0, 0xFF, 0, 0);

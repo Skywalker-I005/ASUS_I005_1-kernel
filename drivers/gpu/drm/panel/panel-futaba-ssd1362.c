@@ -836,6 +836,30 @@ static ssize_t Pattern_store(struct device *dev,
 				case 2:
 				case 3:
 				case 4:
+					if (val == 2)
+						pattern = 0xF800;
+					else if (val == 3)
+						pattern = 0x07E0;
+					else if (val == 4)
+						pattern = 0x001F;
+					tmp = ptr;
+					for (i=0; i<256; i++) {
+						if (val == 2) {
+							memset(tmp, 0xF8, 1);
+						} else if (val == 3) {
+							memset(tmp, 0x07, 1);
+							memset((tmp+1), 0xE0, 1);
+						} else if (val == 4) {
+							memset((tmp+1), 0x1F, 1);
+						}
+						tmp+=2;
+					}
+					tmp = ptr + 512;
+					for (i=0; i <63; i++) {
+						memcpy(tmp, ptr, 512);
+						tmp += 512;
+					}
+				#if 0
 					memset(ptr, 0xFF, 512);
 					ptr += 512;
 					if (val == 2)
@@ -881,6 +905,7 @@ static ssize_t Pattern_store(struct device *dev,
 						tmp += 512;
 					}
 					memset(tmp, 0xFF, 512);
+				#endif
 					break;
 				case 5:
 					i=0;

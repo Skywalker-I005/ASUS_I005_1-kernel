@@ -136,6 +136,7 @@ int snt_activity_request_force(int force)
 
 int snt_activity_request(void)
 {
+	Grip_Driver_IRQ_EN(1);
 	return snt_activity_request_force(0 /* No Force */ );
 }
 

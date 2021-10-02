@@ -87,6 +87,14 @@ struct completion usb_host_complete1;
 struct completion usb_host_complete2;
 
 #if defined ASUS_ZS673KS_PROJECT
+static int delay_check = 4000;
+module_param(delay_check, int, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(delay_check, "check timming");
+
+static int retries_cnt = 7;
+module_param(retries_cnt, int, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(retries_cnt, "retries counts");
+
 struct gpio_control_redirver *redriver_gpio_ctrl;
 struct regulator *vcc_redriver;
 static int redriver_reset_n(int val);
@@ -526,6 +534,9 @@ struct dwc3_msm {
 	struct pm_qos_request pm_qos_req_dma;
 	struct delayed_work perf_vote_work;
 	struct delayed_work sdp_check;
+#if defined ASUS_ZS673KS_PROJECT
+	struct delayed_work retries_reset_work;
+#endif
 	struct mutex suspend_resume_mutex;
 
 	enum usb_device_speed override_usb_speed;
@@ -2436,6 +2447,12 @@ static void dwc3_msm_notify_event(struct dwc3 *dwc,
 		break;
 	case DWC3_CONTROLLER_NOTIFY_OTG_EVENT:
 		dev_dbg(mdwc->dev, "DWC3_CONTROLLER_NOTIFY_OTG_EVENT received\n");
+#if defined ASUS_ZS673KS_PROJECT
+		if (value == 1 && !strcmp("a800000.ssusb", dev_name(mdwc->dev))){
+			schedule_delayed_work(&mdwc->retries_reset_work, msecs_to_jiffies(delay_check));
+			break;
+		}
+#endif
 		if (dwc->enable_bus_suspend) {
 			mdwc->suspend = dwc->b_suspend;
 			queue_work(mdwc->dwc3_wq, &mdwc->resume_work);
@@ -3678,6 +3695,22 @@ static int dwc3_msm_id_notifier(struct notifier_block *nb,
 	return NOTIFY_DONE;
 }
 
+#if defined ASUS_ZS673KS_PROJECT
+static void dwc3_retries_reset_work(struct work_struct *w)
+{
+	struct dwc3_msm *mdwc = container_of(w, struct dwc3_msm, retries_reset_work.work);
+	struct dwc3 *dwc = platform_get_drvdata(mdwc->dwc3);
+	int retries;
+
+	retries = dwc->retries_reset + dwc->retries_suspend;
+	if (retries > retries_cnt && dwc->vbus_active) {
+		redriver_enable(0);
+		dev_info(mdwc->dev,"retries reset disable redriver\n");
+
+	} else
+		dev_info(mdwc->dev,"retries reset %d, suspned %d vbus %d\n", dwc->retries_reset, dwc->retries_suspend, dwc->vbus_active);
+}
+#endif
 static void check_for_sdp_connection(struct work_struct *w)
 {
 	struct dwc3_msm *mdwc =
@@ -4073,6 +4106,9 @@ static DEVICE_ATTR_RW(mode_POGO);
 #endif
 
 static void msm_dwc3_perf_vote_work(struct work_struct *w);
+#if defined ASUS_ZS673KS_PROJECT
+static void dwc3_retries_reset_work(struct work_struct *w);
+#endif
 
 /* This node only shows max speed supported dwc3 and it should be
  * same as what is reported in udc/core.c max_speed node. For current
@@ -4619,6 +4655,7 @@ static int dwc3_msm_probe(struct platform_device *pdev)
 	INIT_DELAYED_WORK(&mdwc->perf_vote_work, msm_dwc3_perf_vote_work);
 	INIT_DELAYED_WORK(&mdwc->sdp_check, check_for_sdp_connection);
 #if defined ASUS_ZS673KS_PROJECT
+	INIT_DELAYED_WORK(&mdwc->retries_reset_work, dwc3_retries_reset_work);
 	redriver_init(mdwc);
 #endif
 	mdwc->dwc3_wq = alloc_ordered_workqueue("dwc3_wq", 0);
@@ -5625,6 +5662,9 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 			dev_dbg(mdwc->dev, "!id || !bsv\n");
 			mdwc->drd_state = DRD_STATE_IDLE;
 			cancel_delayed_work_sync(&mdwc->sdp_check);
+#if defined ASUS_ZS673KS_PROJECT
+			cancel_delayed_work_sync(&mdwc->retries_reset_work);
+#endif
 			dwc3_otg_start_peripheral(mdwc, 0);
 			/*
 			 * Decrement pm usage count upon cable disconnect

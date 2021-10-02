@@ -441,6 +441,7 @@ void asus_init_probe(void){
 	create_Grip_Slide_min_pos_proc_file();
 	create_Grip_Slide_max_pos_proc_file();
 	create_Grip_Slide_vib_en_proc_file();
+	create_Grip_Slide_tap_priority_proc_file();
 	
 	create_Grip_Swipe_en_proc_file();
 	create_Grip_Swipe_velocity_proc_file();

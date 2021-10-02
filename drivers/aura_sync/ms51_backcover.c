@@ -1760,21 +1760,10 @@ static int ms51_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
 	int err = 0;
 	struct ms51_platform_data *platform_data;
-	int count=1;
-	unsigned char data[4] = {0};
-	unsigned char *buf_cmd;
-	struct i2c_msg msgs[2];
 
 	if(g_Charger_mode) {
 		printk("[AURA_BACKCOVER] In charger mode, stop ms51_probe\n");
 		return 0;
-	}
-	
-	buf_cmd = kmalloc(sizeof(unsigned char)*49, GFP_DMA);
-	if (!buf_cmd) {
-		printk("unable to allocate buf_cmd memory\n");
-		kfree(buf_cmd);
-		return -ENOMEM;
 	}
 
 	printk("[AURA_BACKCOVER] ms51_probe,client->addr : 0x%x\n", client->addr);
@@ -1782,7 +1771,6 @@ static int ms51_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	platform_data = devm_kzalloc(&client->dev, sizeof(struct ms51_platform_data), GFP_KERNEL);
 	if (!platform_data) {
 		dev_err(&client->dev, "Failed to allocate memory\n");
-		kfree(buf_cmd);
 		return -ENOMEM;
 	}
 
@@ -1808,72 +1796,6 @@ static int ms51_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	} else
 		printk("[AURA_BACKCOVER] I2C function test pass\n");
 
-	printk("[AURA_BACKCOVER] get fw_mode in probe function.\n");
-	memset(buf_cmd,0,sizeof(unsigned char)*48);
-	buf_cmd[0] = 0xCA;
-	/*for(i=0;i<48;i++){
-		printk("[AURA_BACKCOVER] buf[%d]= %x",i,buf[i]);
-	}*/
-
-	mutex_lock(&platform_data->ms51_mutex);
-	//i2c_read_bytes(client, buf_cmd, 48, data, 1);
-
-	//send register address
-	msgs[0].flags = !I2C_M_RD;	//write
-	msgs[0].addr = client->addr;
-	msgs[0].len = 48;
-	msgs[0].buf = buf_cmd;
-	i2c_transfer(client->adapter,&msgs[0], 1);
-
-	msleep(1);
-	//read data
-	msgs[1].flags = I2C_M_RD;		//read
-	msgs[1].addr = client->addr;
-	msgs[1].len = 1;
-	msgs[1].buf = data;
-
-	i2c_transfer(client->adapter,&msgs[1], 1);
-
-	mutex_unlock(&platform_data->ms51_mutex);
-
-	while(data[0]!=1 && data[0]!=2){
-		printk("[AURA_BACKCOVER] get fw_mode in probe failed for the %d time, we will reset and retry\n",count);
-		if ( gpio_is_valid(platform_data->ms51_enable_pin) ) {
-			gpio_set_value(platform_data->ms51_enable_pin, 0);
-		}else {
-			printk("[AURA_BACKCOVER] ms51_on is not vaild\n");
-		}
-		if ( gpio_is_valid(platform_data->ms51_enable_pin) ) {
-			gpio_set_value(platform_data->ms51_enable_pin, 1);
-		}else {
-			printk("[AURA_BACKCOVER] ms51_on is not vaild\n");
-		}
-		msleep(500); //sleep 350ms for waiting ic power on.
-		memset(buf_cmd,0,sizeof(unsigned char)*48);
-		buf_cmd[0] = 0xCA;
-		mutex_lock(&platform_data->ms51_mutex);
-		msgs[0].flags = !I2C_M_RD;	//write
-		msgs[0].addr = client->addr;
-		msgs[0].len = 48;
-		msgs[0].buf = buf_cmd;
-		i2c_transfer(client->adapter,&msgs[0], 1);
-
-		msleep(1);
-
-		msgs[1].flags = I2C_M_RD;		//read
-		msgs[1].addr = client->addr;
-		msgs[1].len = 1;
-		msgs[1].buf = data;
-		i2c_transfer(client->adapter,&msgs[1], 1);
-		mutex_unlock(&platform_data->ms51_mutex);
-		count=count+1;
-		if(count==10)
-			break;
-	}
-	if(data[0]!=1 && data[0]!=2){
-			printk("[AURA_BACKCOVER] get fw_mode in probe failed for the second time, we will return\n");
-			goto aura_en_remove;
-		}
 // Register sys class  
 	err = aura_sync_register(&client->dev, platform_data);
 	if (err) {
@@ -1914,7 +1836,6 @@ aura_en_remove:
 	
 //parse_remove:
 	mutex_destroy(&platform_data->ms51_mutex);
-	kfree(buf_cmd);
 	return -1;
 }
 

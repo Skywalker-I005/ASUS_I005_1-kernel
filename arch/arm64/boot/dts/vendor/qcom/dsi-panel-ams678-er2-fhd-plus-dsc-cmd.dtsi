@@ -166,7 +166,7 @@
 					15 01 00 00 00 00 02 B0 05
 					15 01 00 00 00 00 02 B7 13
 					15 01 00 00 00 00 02 B0 01
-					15 01 00 00 00 00 02 B7 5F
+					15 01 00 00 00 00 02 B7 5C
 					39 01 00 00 00 00 03 F0 A5 A5
 					// HBM ON
 					15 01 00 00 00 00 02 53 E0
@@ -181,7 +181,7 @@
 					15 01 00 00 00 00 02 B0 05
 					15 01 00 00 00 00 02 B7 13
 					15 01 00 00 00 00 02 B0 01
-					15 01 00 00 00 00 02 B7 5F
+					15 01 00 00 00 00 02 B7 5C
 					39 01 00 00 00 00 03 F0 A5 A5
 					// HBM ON
 					15 01 00 00 00 00 02 53 E0
@@ -191,6 +191,16 @@
 				qcom,mdss-dsi-fod-hbm-off-command = [
 					// HBM OFF
 					15 01 00 00 00 00 02 53 20
+					// ELVSS DIM ON & DLY ON
+					39 01 00 00 00 00 03 F0 5A 5A
+					15 01 00 00 00 00 02 B0 05
+					15 01 00 00 00 00 02 B7 93
+					15 01 00 00 00 00 02 B0 01
+					15 01 00 00 00 00 02 B7 57
+					39 01 00 00 00 00 03 F0 A5 A5
+				];
+
+				qcom,mdss-dsi-dim-dly-on-command = [
 					// ELVSS DIM ON & DLY ON
 					39 01 00 00 00 00 03 F0 5A 5A
 					15 01 00 00 00 00 02 B0 05
@@ -308,6 +318,7 @@
 				qcom,mdss-dsi-fod-hbm-on-command-state = "dsi_hs_mode";
 				qcom,mdss-dsi-post-fod-hbm-on-command-state = "dsi_hs_mode";
 				qcom,mdss-dsi-fod-hbm-off-command-state = "dsi_hs_mode";
+				qcom,mdss-dsi-dim-dly-on-command-state = "dsi_hs_mode";
 				qcom,mdss-dsi-lp1-command-state = "dsi_hs_mode";
 				qcom,mdss-dsi-nolp-command-state = "dsi_hs_mode";
 				qcom,mdss-dsi-aod-high-command-state = "dsi_hs_mode";
@@ -449,7 +460,7 @@
 					15 01 00 00 00 00 02 B0 05
 					15 01 00 00 00 00 02 B7 13
 					15 01 00 00 00 00 02 B0 01
-					15 01 00 00 00 00 02 B7 5F
+					15 01 00 00 00 00 02 B7 5C
 					39 01 00 00 00 00 03 F0 A5 A5
 					// HBM ON
 					15 01 00 00 00 00 02 53 E0
@@ -464,7 +475,7 @@
 					15 01 00 00 00 00 02 B0 05
 					15 01 00 00 00 00 02 B7 13
 					15 01 00 00 00 00 02 B0 01
-					15 01 00 00 00 00 02 B7 5F
+					15 01 00 00 00 00 02 B7 5C
 					39 01 00 00 00 00 03 F0 A5 A5
 					// HBM ON
 					15 01 00 00 00 00 02 53 E0
@@ -474,6 +485,16 @@
 				qcom,mdss-dsi-fod-hbm-off-command = [
 					// HBM OFF
 					15 01 00 00 00 00 02 53 20
+					// ELVSS DIM ON & DLY ON
+					39 01 00 00 00 00 03 F0 5A 5A
+					15 01 00 00 00 00 02 B0 05
+					15 01 00 00 00 00 02 B7 93
+					15 01 00 00 00 00 02 B0 01
+					15 01 00 00 00 00 02 B7 57
+					39 01 00 00 00 00 03 F0 A5 A5
+				];
+
+				qcom,mdss-dsi-dim-dly-on-command = [
 					// ELVSS DIM ON & DLY ON
 					39 01 00 00 00 00 03 F0 5A 5A
 					15 01 00 00 00 00 02 B0 05
@@ -547,6 +568,7 @@
 				qcom,mdss-dsi-fod-hbm-on-command-state = "dsi_hs_mode";
 				qcom,mdss-dsi-post-fod-hbm-on-command-state = "dsi_hs_mode";
 				qcom,mdss-dsi-fod-hbm-off-command-state = "dsi_hs_mode";
+				qcom,mdss-dsi-dim-dly-on-command-state = "dsi_hs_mode";
 				qcom,mdss-dsi-lp1-command-state = "dsi_hs_mode";
 				qcom,mdss-dsi-nolp-command-state = "dsi_hs_mode";
 				qcom,mdss-dsi-aod-high-command-state = "dsi_hs_mode";
@@ -688,7 +710,7 @@
 					15 01 00 00 00 00 02 B0 05
 					15 01 00 00 00 00 02 B7 13
 					15 01 00 00 00 00 02 B0 01
-					15 01 00 00 00 00 02 B7 5F
+					15 01 00 00 00 00 02 B7 5C
 					39 01 00 00 00 00 03 F0 A5 A5
 					// HBM ON
 					15 01 00 00 00 00 02 53 E0
@@ -703,7 +725,7 @@
 					15 01 00 00 00 00 02 B0 05
 					15 01 00 00 00 00 02 B7 13
 					15 01 00 00 00 00 02 B0 01
-					15 01 00 00 00 00 02 B7 5F
+					15 01 00 00 00 00 02 B7 5C
 					39 01 00 00 00 00 03 F0 A5 A5
 					// HBM ON
 					15 01 00 00 00 00 02 53 E0
@@ -713,6 +735,16 @@
 				qcom,mdss-dsi-fod-hbm-off-command = [
 					// HBM OFF
 					15 01 00 00 00 00 02 53 20
+					// ELVSS DIM ON & DLY ON
+					39 01 00 00 00 00 03 F0 5A 5A
+					15 01 00 00 00 00 02 B0 05
+					15 01 00 00 00 00 02 B7 93
+					15 01 00 00 00 00 02 B0 01
+					15 01 00 00 00 00 02 B7 57
+					39 01 00 00 00 00 03 F0 A5 A5
+				];
+
+				qcom,mdss-dsi-dim-dly-on-command = [
 					// ELVSS DIM ON & DLY ON
 					39 01 00 00 00 00 03 F0 5A 5A
 					15 01 00 00 00 00 02 B0 05
@@ -786,6 +818,7 @@
 				qcom,mdss-dsi-fod-hbm-on-command-state = "dsi_hs_mode";
 				qcom,mdss-dsi-post-fod-hbm-on-command-state = "dsi_hs_mode";
 				qcom,mdss-dsi-fod-hbm-off-command-state = "dsi_hs_mode";
+				qcom,mdss-dsi-dim-dly-on-command-state = "dsi_hs_mode";
 				qcom,mdss-dsi-lp1-command-state = "dsi_hs_mode";
 				qcom,mdss-dsi-nolp-command-state = "dsi_hs_mode";
 				qcom,mdss-dsi-aod-high-command-state = "dsi_hs_mode";

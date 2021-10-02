@@ -260,6 +260,16 @@ static struct work_struct pwr_press_work;
 static struct work_struct volDown_press_work;
 
 // ASUS_BSP ---
+//ASUS_BSP_joe1_++
+#define POWERKEY_SW_DEBOUNCE
+
+#ifdef POWERKEY_SW_DEBOUNCE
+static s64 g_prev_time = 0;
+static long g_filter = 25; //ms
+module_param(g_filter, long, S_IRUGO|S_IWUSR);
+#endif
+//ASUS_BSP_joe1_--
+
 extern unsigned int b_press;
 /* ASUS_BSP + [ASDF]long press power key 6sec,reset device.. ++ */
 static struct qpnp_pon *pon_for_powerkey;
@@ -1228,6 +1238,14 @@ static int qpnp_pon_input_dispatch(struct qpnp_pon *pon, u32 pon_type)
 	u8  pon_rt_bit = 0;
 	u32 key_status;
 	uint pon_rt_sts;
+	//ASUS_BSP_joe1_++
+#if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT
+#ifdef POWERKEY_SW_DEBOUNCE
+	s64 interval;
+	static int iCount = 0;
+#endif
+#endif
+//ASUS_BSP_joe1_--
 	u64 elapsed_us;
 	int rc;
 
@@ -1314,7 +1332,33 @@ static int qpnp_pon_input_dispatch(struct qpnp_pon *pon, u32 pon_type)
 	}
 	printk("[keypad][qpnp-power-on.c] keycode=%d, state=%s\n", cfg->key_code, key_status?"press":"release");//ASUS BSP Hank +++
 #endif
+//ASUS_BSP_joe1_++
+#if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT
+#ifdef POWERKEY_SW_DEBOUNCE
+	if (cfg->key_code == 116){
+		interval = (ktime_to_ms(ktime_get()) - g_prev_time);
+		//printk("[qpnp-power-on.c] interval = %d ms\n", (int)interval);
 
+		if ( interval < g_filter )
+			if ( key_status ) {
+				printk("[qpnp-power-on.c] The keycode %d %s, skipped! g_filter = %d ms; interval = %d ms\n", cfg->key_code, key_status?"press":"release", (int)g_filter, (int)interval);
+				return 0;
+			}
+
+		if ( (cfg->old_state == key_status) && (iCount < 3) ){
+			printk("[qpnp-power-on.c] Skip the invalid key status, old_state=%s; new_state=%s; iCount=%d\n", cfg->old_state?"press":"release", key_status?"press":"release", iCount);
+			iCount++;
+			cfg->old_state = !!key_status;
+			return 0;
+		} else{
+			iCount = 0;
+		}
+	}
+#endif
+//ASUS_BSP_joe1_--
+
+//ASUS_BSP_joe1_++
+#ifndef POWERKEY_SW_DEBOUNCE
 
 	if (pon->kpdpwr_dbc_enable && cfg->pon_type == PON_KPDPWR) {
 		if (!key_status)
@@ -1327,14 +1371,26 @@ static int qpnp_pon_input_dispatch(struct qpnp_pon *pon, u32 pon_type)
 	 */
 	if (!cfg->old_state && !key_status) {
 		input_report_key(pon->pon_input, cfg->key_code, 1);
+		//wake_lock_timeout(&pwr_key_wake_lock, 3000);
 		input_sync(pon->pon_input);
 	}
-
+#endif
+#endif
+//ASUS_BSP_joe1_--
 	input_report_key(pon->pon_input, cfg->key_code, key_status);
 	input_sync(pon->pon_input);
 
 	cfg->old_state = !!key_status;
-
+//ASUS_BSP_joe1_++
+#if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT
+#ifdef POWERKEY_SW_DEBOUNCE
+	if (cfg->key_code == 116){
+		g_prev_time = ktime_to_ms(ktime_get());
+		//printk("[qpnp-power-on.c] cfg->old_state =%d; g_prev_time\n", cfg->old_state);
+	}
+#endif
+#endif
+//ASUS_BSP_joe1_--
 	return 0;
 }
 

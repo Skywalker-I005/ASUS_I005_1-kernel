@@ -311,6 +311,7 @@ struct grip_status {
 	int G_SLIDE_DIST[2];
 	int G_SLIDE_FORCE[2];
 	int G_SLIDE_VIB_EN[2];
+	int G_SLIDE_TAP_PRIORITY[2];
 	int G_SLIDE_MIN_POS[2];
 	int G_SLIDE_MAX_POS[2];
 	int G_SLIDE_2ND_DIST[2];

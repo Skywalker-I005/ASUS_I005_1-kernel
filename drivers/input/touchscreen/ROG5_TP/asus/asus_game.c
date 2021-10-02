@@ -438,6 +438,8 @@ void ATR_touch(int id,int action, int x, int y, int random)
 	int i;
 
 	static bool first_continue_flag = false;
+	x= x*16;
+	y = y*16;
 	
 	FTS_INFO("keymapping ATR_touch  id=%d, action=%d, x=%d, y=%d", id, action,  x,  y);
 	mutex_lock(&input_dev->mutex);
@@ -747,7 +749,7 @@ static ssize_t game_settings_store(
 	
 	if (!fts_data->suspended) {
 	    mutex_lock(&fts_data->reg_lock);
-	    fts_irq_disable();
+//	    fts_irq_disable();
 	    for (i = 0; i < 6; i++) {
 		ret1 = fts_write_reg(FTS_REG_SLIDING_SENSITIVITY, slidling_sen);
 		msleep(5);
@@ -786,7 +788,7 @@ static ssize_t game_settings_store(
 		    msleep(5);
 		}
 	    }
-	    fts_irq_enable();
+//	    fts_irq_enable();
 	    mutex_unlock(&fts_data->reg_lock);
 	}
 	wait_resume = false;

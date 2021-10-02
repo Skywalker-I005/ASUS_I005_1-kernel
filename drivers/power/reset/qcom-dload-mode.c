@@ -39,6 +39,10 @@ static bool enable_dump =
 	IS_ENABLED(CONFIG_POWER_RESET_QCOM_DOWNLOAD_MODE_DEFAULT);
 static enum qcom_download_mode current_download_mode = QCOM_DOWNLOAD_NODUMP;
 static enum qcom_download_mode dump_mode = QCOM_DOWNLOAD_MINIDUMP;
+//[+++]ASUS_BSP : Enable Full RAMDUMP for ADSP analysis if QPST download is enabled
+enum qcom_download_mode download_mode_adsp = QCOM_DOWNLOAD_NODUMP;
+EXPORT_SYMBOL(download_mode_adsp);
+//[---]ASUS_BSP : Enable Full RAMDUMP for ADSP analysis if QPST download is enabled
 
 static int set_download_mode(enum qcom_download_mode mode)
 {
@@ -49,6 +53,7 @@ static int set_download_mode(enum qcom_download_mode mode)
 			return -ENODEV;
 	}
 	current_download_mode = mode;
+	download_mode_adsp = mode;//ASUS_BSP : Add for ADSP subsystem restart use
 	qcom_scm_set_download_mode(mode, 0);
 	return 0;
 }

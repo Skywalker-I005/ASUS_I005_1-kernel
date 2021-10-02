@@ -40,6 +40,7 @@
 char evtlog_bootup_reason[100];
 char evtlog_poweroff_reason[100];
 char evtlog_warm_reset_reason[100];
+static char console_msg_bootcount[8] ;
 
 #if defined ASUS_SAKE_PROJECT || defined ASUS_VODKA_PROJECT
 extern u16 warm_reset_value;
@@ -81,6 +82,14 @@ int asus_rtc_read_time(struct rtc_time *tm)
 	return 0;
 }
 EXPORT_SYMBOL(asus_rtc_read_time);
+
+static int __init console_bootcount_setup(char *str)
+{
+               strncpy(console_msg_bootcount, str,8);
+		return 0;
+}
+__setup("androidboot.bootcount=", console_bootcount_setup);
+
 #define AID_SDCARD_RW 1015
 static void sys_rename1(char * filepath, char *filepath_old){
 	int hfile1,hfile2_old;
@@ -989,21 +998,25 @@ static void do_write_event_worker(struct work_struct *work)
         // ASUS_BSP +++
         if (warm_reset_value) {
     		snprintf(buffer, sizeof(buffer),
-                "\n\n---------------System Boot----%s---------\n"
+                "\n\n---------------System Boot----%s---Bootcount : %s---\n"
                 "[Reboot] Warm reset Reason: %s ###### \n"
                 "###### Bootup Reason: %s ######\n",
                 ASUS_SW_VER,
+		console_msg_bootcount,
                 evtlog_warm_reset_reason,
-                evtlog_bootup_reason);
+                evtlog_bootup_reason
+		);
 
         } else {
     		snprintf(buffer, sizeof(buffer),
-                "\n\n---------------System Boot----%s---------\n"
+                "\n\n---------------System Boot----%s---BootCount : %s------\n"
                 "[Shutdown] Power off Reason: %s ###### \n"
                 "###### Bootup Reason: %s ######\n",
                 ASUS_SW_VER,
+		console_msg_bootcount,
                 evtlog_poweroff_reason,
-                evtlog_bootup_reason);
+                evtlog_bootup_reason
+		);
         }
         // ASUS_BSP ---
 		ksys_write(g_hfileEvtlog, buffer, strlen(buffer));

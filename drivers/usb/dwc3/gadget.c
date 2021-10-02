@@ -3295,6 +3295,10 @@ static void dwc3_gadget_disconnect_interrupt(struct dwc3 *dwc)
 	dwc->link_state = DWC3_LINK_STATE_SS_DIS;
 	usb_gadget_set_state(&dwc->gadget, USB_STATE_NOTATTACHED);
 
+#if defined ASUS_ZS673KS_PROJECT
+	dwc->retries_reset = 0;
+	dwc->retries_suspend = 0;
+#endif
 	dwc->connected = false;
 }
 
@@ -3302,7 +3306,14 @@ static void dwc3_gadget_reset_interrupt(struct dwc3 *dwc)
 {
 	u32			reg;
 
+#if defined ASUS_ZS673KS_PROJECT
+	if (!dwc->connected) {
+		dwc3_notify_event(dwc, DWC3_CONTROLLER_NOTIFY_OTG_EVENT, 1);
+	}
+	dwc->retries_reset++;
+#endif
 	dwc->connected = true;
+
 
 	/*
 	 * WORKAROUND: DWC3 revisions <1.88a have an issue which
@@ -3728,6 +3739,9 @@ static void dwc3_gadget_interrupt(struct dwc3 *dwc,
 		if (dwc->revision >= DWC3_REVISION_230A) {
 			dbg_event(0xFF, "GAD SUS", 0);
 			dwc->dbg_gadget_events.suspend++;
+#if defined ASUS_ZS673KS_PROJECT
+			dwc->retries_suspend++;
+#endif
 			/*
 			 * Ignore suspend event until the gadget enters into
 			 * USB_STATE_CONFIGURED state.
