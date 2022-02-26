@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2020-2021 The Linux Foundation. All rights reserved.
  */
 
 #ifndef __QTI_POWER_SUPPLY_IIO_H__
@@ -140,7 +140,6 @@
 #define PSY_IIO_CP_INPUT_CURRENT_MAX		0x72
 #define PSY_IIO_CURRENT_CAPABILITY		0x73
 
-#if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT
 /* SMB1355 Parallel */
 #define PSY_IIO_CHARGE_TYPE			0x74
 #define PSY_IIO_ONLINE				0x75
@@ -149,5 +148,10 @@
 #define PSY_IIO_INPUT_SUSPEND			0x78
 #define PSY_IIO_PARALLEL_BATFET_MODE		0x79
 #define PSY_IIO_PARALLEL_FCC_MAX		0x7a
-#endif
+
+/* USB */
+#define PSY_IIO_MOISTURE_DETECTION_EN		0x7b
+
+/* BMS */
+#define PSY_IIO_CLEAR_SOH			0x7c
 #endif /* __QTI_POWER_SUPPLY_IIO_H__ */

@@ -1096,9 +1096,7 @@ __do_replace(struct net *net, const char *name, unsigned int valid_hooks,
 	    (newinfo->number <= oldinfo->initial_entries))
 		module_put(t->me);
 
-#if defined(ASUS_ZS673KS_PROJECT) || defined(ASUS_PICASSO_PROJECT) || defined(ASUS_SAKE_PROJECT) || defined(ASUS_VODKA_PROJECT)
 	xt_table_unlock(t);
-#endif
 
 	get_old_counters(oldinfo, counters);
 
@@ -1113,10 +1111,6 @@ __do_replace(struct net *net, const char *name, unsigned int valid_hooks,
 		net_warn_ratelimited("iptables: counters copy to user failed while replacing table\n");
 	}
 	vfree(counters);
-#if defined(ASUS_ZS673KS_PROJECT) || defined(ASUS_PICASSO_PROJECT) || defined(ASUS_SAKE_PROJECT) || defined(ASUS_VODKA_PROJECT)
-#else
-	xt_table_unlock(t);
-#endif
 	return ret;
 
  put_module:
@@ -1459,6 +1453,8 @@ translate_compat_table(struct net *net,
 	newinfo = xt_alloc_table_info(size);
 	if (!newinfo)
 		goto out_unlock;
+
+	memset(newinfo->entries, 0, size);
 
 	newinfo->number = compatr->num_entries;
 	for (i = 0; i < NF_INET_NUMHOOKS; i++) {

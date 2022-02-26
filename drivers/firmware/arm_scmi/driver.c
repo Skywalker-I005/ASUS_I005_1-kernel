@@ -174,6 +174,8 @@ static const int scmi_linux_errmap[] = {
 	-EPROTO,		/* SCMI_ERR_PROTOCOL */
 };
 
+static int scmi_mbox_free_channel(int id, void *p, void *data);
+
 static inline int scmi_to_linux_errno(int errno)
 {
 	if (errno < SCMI_SUCCESS && errno > SCMI_ERR_MAX)
@@ -370,6 +372,10 @@ static void scmi_rx_callback(struct mbox_client *cl, void *m)
 
 	xfer = &minfo->xfer_block[xfer_id];
 
+	/* rx.len could be shrunk in the sync do_xfer, so reset to maxsz */
+	if (msg_type == MSG_TYPE_DELAYED_RESP)
+		xfer->rx.len = info->desc->max_msg_size;
+
 	scmi_dump_header_dbg(dev, &xfer->hdr);
 
 	scmi_fetch_response(xfer, mem);
@@ -479,6 +485,14 @@ int scmi_do_xfer(const struct scmi_handle *handle, struct scmi_xfer *xfer)
 	mbox_client_txdone(cinfo->chan, ret);
 
 	return ret;
+}
+
+void scmi_reset_rx_to_maxsz(const struct scmi_handle *handle,
+			    struct scmi_xfer *xfer)
+{
+	struct scmi_info *info = handle_to_scmi_info(handle);
+
+	xfer->rx.len = info->desc->max_msg_size;
 }
 
 #define SCMI_MAX_RESPONSE_TIMEOUT	(2 * MSEC_PER_SEC)
@@ -824,6 +838,21 @@ scmi_create_protocol_device(struct device_node *np, struct scmi_info *info,
 	scmi_set_handle(sdev);
 }
 
+static void scmi_cleanup_mbox_channels(struct scmi_info *info)
+{
+	struct idr *idr;
+
+	/* free tx channels */
+	idr = &info->tx_idr;
+	idr_for_each(idr, scmi_mbox_free_channel, idr);
+	idr_destroy(&info->tx_idr);
+
+	/* free rx channels */
+	idr = &info->rx_idr;
+	idr_for_each(idr, scmi_mbox_free_channel, idr);
+	idr_destroy(&info->rx_idr);
+}
+
 static int scmi_probe(struct platform_device *pdev)
 {
 	int ret;
@@ -870,6 +899,7 @@ static int scmi_probe(struct platform_device *pdev)
 	ret = scmi_base_protocol_init(handle);
 	if (ret) {
 		dev_err(dev, "unable to communicate with SCMI(%d)\n", ret);
+		scmi_cleanup_mbox_channels(info);
 		return ret;
 	}
 
@@ -941,7 +971,7 @@ static int scmi_remove(struct platform_device *pdev)
 }
 
 static const struct scmi_desc scmi_generic_desc = {
-	.max_rx_timeout_ms = 30,	/* We may increase this if required */
+	.max_rx_timeout_ms = 1000,	/* We may increase this if required */
 	.max_msg = 20,		/* Limited by MBOX_TX_QUEUE_LEN */
 	.max_msg_size = 128,
 };

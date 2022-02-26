@@ -32,6 +32,7 @@
 #include <linux/nmi.h>
 #include <linux/percpu.h>
 #include <linux/kmod.h>
+#include <linux/kprobes.h>
 #include <linux/vmalloc.h>
 #include <linux/kernel_stat.h>
 #include <linux/start_kernel.h>
@@ -102,6 +103,10 @@
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/initcall.h>
+
+#ifdef CONFIG_QGKI_MSM_BOOT_TIME_MARKER
+#include <soc/qcom/boot_stats.h>
+#endif
 
 static int kernel_init(void *);
 
@@ -175,6 +180,32 @@ static int set_charger_mode(char *str)
 __setup("androidboot.mode=", set_charger_mode);
 EXPORT_SYMBOL(g_Charger_mode);
 /* ASUS_BSP charger --- */
+
+/* ASUS BSP Display +++ */
+// for skip hdcp on unlock device
+#if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT
+char g_verified_boot_state[20];
+char g_unlock[2];
+EXPORT_SYMBOL(g_verified_boot_state);
+EXPORT_SYMBOL(g_unlock);
+
+static int __init verified_boot_state_param(char *line)
+{
+	strlcpy(g_verified_boot_state, line, sizeof(g_verified_boot_state));
+	return 1;
+}
+
+__setup("androidboot.verifiedbootstate=", verified_boot_state_param);
+
+static int __init unlock_param(char *line)
+{
+	strlcpy(g_unlock, line, sizeof(g_unlock));
+	return 1;
+}
+
+__setup("UNLOCKED", unlock_param);
+#endif
+/* ASUS BSP Display --- */
 
 int g_ftm_mode = 0;
 EXPORT_SYMBOL(g_ftm_mode);
@@ -1849,6 +1880,7 @@ static int __ref kernel_init(void *unused)
 	kernel_init_freeable();
 	/* need to finish all async __init code before freeing the memory */
 	async_synchronize_full();
+	kprobe_free_init_mem();
 	ftrace_free_init_mem();
 	free_initmem();
 	mark_readonly();
@@ -1863,6 +1895,10 @@ static int __ref kernel_init(void *unused)
 	numa_default_policy();
 
 	rcu_end_inkernel_boot();
+
+#ifdef CONFIG_QGKI_MSM_BOOT_TIME_MARKER
+	place_marker("M - DRIVER Kernel Boot Done");
+#endif
 
 	if (ramdisk_execute_command) {
 		ret = run_init_process(ramdisk_execute_command);
@@ -1910,7 +1946,7 @@ static noinline void __init kernel_init_freeable(void)
 	 */
 	set_mems_allowed(node_states[N_MEMORY]);
 
-	cad_pid = task_pid(current);
+	cad_pid = get_pid(task_pid(current));
 
 	smp_prepare_cpus(setup_max_cpus);
 

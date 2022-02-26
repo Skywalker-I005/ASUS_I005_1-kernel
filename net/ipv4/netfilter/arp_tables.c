@@ -939,9 +939,7 @@ static int __do_replace(struct net *net, const char *name,
 	    (newinfo->number <= oldinfo->initial_entries))
 		module_put(t->me);
 
-#if defined(ASUS_ZS673KS_PROJECT) || defined(ASUS_PICASSO_PROJECT) || defined(ASUS_SAKE_PROJECT) || defined(ASUS_VODKA_PROJECT)
 	xt_table_unlock(t);
-#endif
 
 	get_old_counters(oldinfo, counters);
 
@@ -957,10 +955,6 @@ static int __do_replace(struct net *net, const char *name,
 		net_warn_ratelimited("arptables: counters copy to user failed while replacing table\n");
 	}
 	vfree(counters);
-#if defined(ASUS_ZS673KS_PROJECT) || defined(ASUS_PICASSO_PROJECT) || defined(ASUS_SAKE_PROJECT) || defined(ASUS_VODKA_PROJECT)
-#else
-	xt_table_unlock(t);
-#endif
 	return ret;
 
  put_module:
@@ -1223,6 +1217,8 @@ static int translate_compat_table(struct net *net,
 	newinfo = xt_alloc_table_info(size);
 	if (!newinfo)
 		goto out_unlock;
+
+	memset(newinfo->entries, 0, size);
 
 	newinfo->number = compatr->num_entries;
 	for (i = 0; i < NF_ARP_NUMHOOKS; i++) {
@@ -1610,10 +1606,15 @@ out_free:
 	return ret;
 }
 
-void arpt_unregister_table(struct net *net, struct xt_table *table,
-			   const struct nf_hook_ops *ops)
+void arpt_unregister_table_pre_exit(struct net *net, struct xt_table *table,
+				    const struct nf_hook_ops *ops)
 {
 	nf_unregister_net_hooks(net, ops, hweight32(table->valid_hooks));
+}
+EXPORT_SYMBOL(arpt_unregister_table_pre_exit);
+
+void arpt_unregister_table(struct net *net, struct xt_table *table)
+{
 	__arpt_unregister_table(net, table);
 }
 

@@ -526,7 +526,7 @@ int mux_power_control(bool enable)
 	wake_lock_timeout(&ec_wake_lock, msecs_to_jiffies(2000));
 	if (gDongleType == Dongle_BackCover) {
 		if (enable && !regulator_enabled) {
-			printk("[EC_HID] enable usb2_mux2_en regulator\n");
+			//printk("[EC_HID] enable usb2_mux2_en regulator\n");
 		
 			ret = regulator_set_voltage(regulator_vdd, 3000000, 3300000);
 			if (ret < 0)
@@ -543,7 +543,7 @@ int mux_power_control(bool enable)
 			regulator_enabled = true;
 			mdelay(2);
 		} else if (!enable && regulator_enabled) {
-			printk("[EC_HID] disable usb2_mux2_en regulator\n");
+			//printk("[EC_HID] disable usb2_mux2_en regulator\n");
 			mdelay(3);
 			ret = regulator_disable(regulator_vdd);
 			if (ret)

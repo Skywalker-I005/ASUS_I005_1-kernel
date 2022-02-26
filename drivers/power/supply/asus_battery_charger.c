@@ -2941,8 +2941,9 @@ static int print_battery_status(void)
 	int rc = 0;
 	char battInfo[256];
 	char battInfo2[256];
-	int bat_cap = 0, bat_fcc = 0, bat_vol = 0, bat_cur = 0, bat_temp = 0, chg_sts = 0, bat_health = 0, charge_counter = 0;
+	int bat_cap = 0, bat_fcc = 0, bat_vol = 0, bat_cur = 0, bat_temp = 0, chg_sts = 0, bat_health = 0, charge_counter = 0, soh = 0;
 	char UTSInfo[256]; //ASUS_BSP add to printk the WIFI hotspot & QXDM UTS event
+	struct psy_state *pst = &g_bcdev->psy_list[PSY_TYPE_BATTERY];
 
 	get_oem_batt_temp_from_ADSP();
 	get_oem_cell_volt_from_ADSP();
@@ -2996,6 +2997,12 @@ static int print_battery_status(void)
 	else
 		charge_counter = prop.intval;
 
+	rc = read_property_id(g_bcdev, pst, 5); //5: BATT_SOH
+	if (rc < 0)
+		CHG_DBG_E("%s: Failed to get SOH, rc=%d\n", rc);
+	else
+		soh = pst->prop[5]; //5: BATT_SOH
+
 	snprintf(battInfo, sizeof(battInfo), "report Capacity ==>%d, FCC:%dmAh, RM:%dmAh, BMS:%d, V:%dmV, Vcell1:%dmV, Vcell2:%dmV, Cur:%dmA, ",
 		bat_cap,
 		bat_fcc/1000,
@@ -3019,10 +3026,11 @@ static int print_battery_status(void)
 
 	ASUSEvtlog("[BAT][Ser]%s", battInfo);
 
-	snprintf(battInfo2, sizeof(battInfo2), "report Capacity2 ==>%d, TFCC:%dmAh, TRM:%dmAh",
+	snprintf(battInfo2, sizeof(battInfo2), "report Capacity2 ==>%d, TFCC:%dmAh, TRM:%dmAh, SOH:%d",
 		bat_cap,
 		ChgPD_Info.TFCC,
-		ChgPD_Info.TRM);
+		ChgPD_Info.TRM,
+		soh);
 
 	ASUSEvtlog("[BAT][Ser]%s", battInfo2);
 
