@@ -411,6 +411,7 @@ bool feature_stop_chg_flag = false;
 //bool bFactoryChgLimit = false;
 struct wake_lock cable_resume_wake_lock;
 struct wake_lock cos_wa_wake_lock;
+struct wake_lock recheck_cc_wake_lock;
 //[---] Add the global variables
 
 //[+++] Add the PDO of source for RT1715
@@ -432,6 +433,7 @@ extern int rt_chg_get_during_swap(void);
 extern bool rt_chg_check_asus_vid(void);
 extern void qti_charge_notify_device_charge(void);
 extern void qti_charge_notify_device_not_charge(void);
+extern int rt_chg_get_remote_cc(void);
 
 #if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT
 typedef void(*dwc3_role_switch_fn)(bool);
@@ -539,6 +541,7 @@ struct iio_channel *side_usb_temp_vadc_chan;
 struct iio_channel *btm_usb_temp_vadc_chan;
 struct delayed_work	asus_min_check_work;
 struct delayed_work	asus_18W_workaround_work;
+struct delayed_work	asus_recheck_cc_work;
 //[+++] Add thermal alert adc function
 
 //[+++]Add log to show charging status in ASUSEvtlog.txt
@@ -629,7 +632,7 @@ void asus_set_ASUS_media_worker(struct work_struct *work)
 	struct oem_set_ASUS_media_req req_msg = { { 0 } };
 	int rc;
 
-	pr_err("asuslib g_ASUS_Media= %d\n", g_ASUS_Media);
+	pr_err("g_ASUS_Media= %d\n", g_ASUS_Media);
 	req_msg.hdr.owner = PMIC_GLINK_MSG_OWNER_OEM;
 	req_msg.hdr.type = MSG_TYPE_REQ_RESP;
 	req_msg.hdr.opcode = OEM_SET_ASUS_media;
@@ -2434,12 +2437,17 @@ EXPORT_SYMBOL(asus_set_invalid_audio_dongle);
 
 int asus_set_vbus_attached_status(int value) {
 	//int ret = 0;
+	bool bBtmCC_sts = 0;
 	if (value) {
 		g_vbus_plug = 1;
 		ASUSEvtlog("[BAT][Ser]Cable Plug-in");
 		qti_charge_notify_device_charge();
 		schedule_delayed_work(&asus_min_check_work, 0);
 		schedule_delayed_work(&asus_18W_workaround_work, msecs_to_jiffies(10000));
+		//[+++]Cancel the wakelock and delayed for recheck_cc workaround
+		wake_unlock(&recheck_cc_wake_lock);
+		cancel_delayed_work(&asus_recheck_cc_work);
+		//[---]Cancel the wakelock and delayed for recheck_cc workaround
 	} else {
 		g_vbus_plug = 0;
 		ASUSEvtlog("[BAT][Ser]Cable Plug-out");
@@ -2460,6 +2468,15 @@ int asus_set_vbus_attached_status(int value) {
 		cancel_delayed_work(&asus_min_check_work);
 		cancel_delayed_work(&asus_18W_workaround_work);
 		wake_unlock(&cable_resume_wake_lock);
+
+		//[+++]Recheck the CC status if VBUS is LOW but CC is HIGH
+		bBtmCC_sts = rt_chg_get_remote_cc();
+		CHG_DBG("%s. bBtmCC_sts : %d \n", __func__, bBtmCC_sts);
+		if (bBtmCC_sts == 1) {
+			wake_lock_timeout(&recheck_cc_wake_lock, msecs_to_jiffies(3200));
+			schedule_delayed_work(&asus_recheck_cc_work, msecs_to_jiffies(3000));
+		}
+		//[---]Recheck the CC status if VBUS is LOW but CC is HIGH
 	}
 	CHG_DBG("%s: g_vbus_plug : %d \n", __func__, g_vbus_plug);
 	return 0;
@@ -2790,6 +2807,17 @@ void asus_18W_workaround_worker(struct work_struct *work)
 		CHG_DBG_E("%s: Failed to set asus_set_charger_limit_mode, rc=%d\n", __func__, rc);
 }
 
+void asus_recheck_cc_worker(struct work_struct *work)
+{
+	bool bBtmCC_sts = 0;
+
+	bBtmCC_sts = rt_chg_get_remote_cc();
+	CHG_DBG("%s.bBtmCC_sts : %d\n", __func__, bBtmCC_sts);
+	if (bBtmCC_sts == 0 && qti_phy_usb) {
+		power_supply_changed(qti_phy_usb);
+	}
+}
+
 #if 0
 static int charge_notifier_callback(struct notifier_block *self,
                                  unsigned long event, void *data)
@@ -2951,49 +2979,49 @@ static int print_battery_status(void)
 
 	rc = power_supply_get_property(qti_phy_bat, POWER_SUPPLY_PROP_CAPACITY, &prop);
 	if (rc < 0)
-		CHG_DBG_E("%s: Failed to get POWER_SUPPLY_PROP_CAPACITY, rc=%d\n", __func__, rc);
+		CHG_DBG_E("%s: Failed to get POWER_SUPPLY_PROP_CAPACITY, rc=%d\n", rc);
 	else
 		bat_cap = prop.intval;
 
 	rc = power_supply_get_property(qti_phy_bat, POWER_SUPPLY_PROP_CHARGE_FULL, &prop);
 	if (rc < 0)
-		CHG_DBG_E("%s: Failed to get POWER_SUPPLY_PROP_CHARGE_FULL, rc=%d\n", __func__, rc);
+		CHG_DBG_E("%s: Failed to get POWER_SUPPLY_PROP_CHARGE_FULL, rc=%d\n", rc);
 	else
 		bat_fcc = prop.intval;
 
 	rc = power_supply_get_property(qti_phy_bat, POWER_SUPPLY_PROP_VOLTAGE_NOW, &prop);
 	if (rc < 0)
-		CHG_DBG_E("%s: Failed to get POWER_SUPPLY_PROP_VOLTAGE_NOW, rc=%d\n", __func__, rc);
+		CHG_DBG_E("%s: Failed to get POWER_SUPPLY_PROP_VOLTAGE_NOW, rc=%d\n", rc);
 	else
 		bat_vol = prop.intval;
 
 	rc = power_supply_get_property(qti_phy_bat, POWER_SUPPLY_PROP_CURRENT_NOW, &prop);
 	if (rc < 0)
-		CHG_DBG_E("%s: Failed to get POWER_SUPPLY_PROP_CURRENT_NOW, rc=%d\n", __func__, rc);
+		CHG_DBG_E("%s: Failed to get POWER_SUPPLY_PROP_CURRENT_NOW, rc=%d\n", rc);
 	else
 		bat_cur = prop.intval;
 
 	rc = power_supply_get_property(qti_phy_bat, POWER_SUPPLY_PROP_TEMP, &prop);
 	if (rc < 0)
-		CHG_DBG_E("%s: Failed to get POWER_SUPPLY_PROP_TEMP, rc=%d\n", __func__, rc);
+		CHG_DBG_E("%s: Failed to get POWER_SUPPLY_PROP_TEMP, rc=%d\n", rc);
 	else
 		bat_temp = prop.intval;
 
 	rc = power_supply_get_property(qti_phy_bat, POWER_SUPPLY_PROP_STATUS, &prop);
 	if (rc < 0)
-		CHG_DBG_E("%s: Failed to get POWER_SUPPLY_PROP_STATUS, rc=%d\n", __func__, rc);
+		CHG_DBG_E("%s: Failed to get POWER_SUPPLY_PROP_STATUS, rc=%d\n", rc);
 	else
 		chg_sts = prop.intval;
 
 	rc = power_supply_get_property(qti_phy_bat, POWER_SUPPLY_PROP_HEALTH, &prop);
 	if (rc < 0)
-		CHG_DBG_E("%s: Failed to get POWER_SUPPLY_PROP_HEALTH, rc=%d\n", __func__, rc);
+		CHG_DBG_E("%s: Failed to get POWER_SUPPLY_PROP_HEALTH, rc=%d\n", rc);
 	else
 		bat_health = prop.intval;
 
 	rc = power_supply_get_property(qti_phy_bat, POWER_SUPPLY_PROP_CHARGE_COUNTER, &prop);
 	if (rc < 0)
-		CHG_DBG_E("%s: Failed to get POWER_SUPPLY_PROP_CHARGE_COUNTER, rc=%d\n", __func__, rc);
+		CHG_DBG_E("%s: Failed to get POWER_SUPPLY_PROP_CHARGE_COUNTER, rc=%d\n", rc);
 	else
 		charge_counter = prop.intval;
 
@@ -3257,6 +3285,7 @@ int asuslib_init(void) {
 	alarm_init(&bat_alarm, ALARM_REALTIME, batAlarm_handler);
 	INIT_DELAYED_WORK(&asus_min_check_work, asus_min_check_worker);
 	INIT_DELAYED_WORK(&asus_18W_workaround_work, asus_18W_workaround_worker);
+	INIT_DELAYED_WORK(&asus_recheck_cc_work, asus_recheck_cc_worker);
 
 #if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT
 	msm_dwc3_register_switch(&dwc3_role_switch);
@@ -3386,8 +3415,9 @@ int asuslib_init(void) {
 		//In post-cs10, something blocks the device in the beginning.
 		//and it will be late to detect cable-out, so make a wakelock to avoid this duration.
 		wake_lock_init(&cos_wa_wake_lock, g_bcdev->dev, "cos_wa_wake_lock");
-		wake_lock_timeout(&cos_wa_wake_lock, msecs_to_jiffies(90000));
+		wake_lock_timeout(&cos_wa_wake_lock, msecs_to_jiffies(60000));
 	}
+	wake_lock_init(&recheck_cc_wake_lock, g_bcdev->dev, "recheck_cc_wake_lock");
 	//register drm notifier
 	INIT_DELAYED_WORK(&asus_set_panelonoff_current_work, asus_set_panelonoff_current_worker);
 	RegisterDRMCallback();
@@ -3396,7 +3426,7 @@ int asuslib_init(void) {
 	schedule_delayed_work(&asus_update_batt_status_work, msecs_to_jiffies(5000));
 
 	INIT_DELAYED_WORK(&asus_set_ASUS_media_work, asus_set_ASUS_media_worker);
-	schedule_delayed_work(&asus_set_ASUS_media_work, 0);
+	schedule_delayed_work(&asus_set_ASUS_media_work, msecs_to_jiffies(6000));
 
 	create_uts_status_proc_file(); //ASUS_BSP LiJen add to printk the WIFI hotspot & QXDM UTS event
 
@@ -3421,6 +3451,7 @@ int asuslib_deinit(void) {
 	wake_lock_destroy(&cable_resume_wake_lock);
 	if (g_Charger_mode)
 		wake_lock_destroy(&cos_wa_wake_lock);
+	wake_lock_destroy(&recheck_cc_wake_lock);
 	class_unregister(&asuslib_class);
 	return 0;
 }

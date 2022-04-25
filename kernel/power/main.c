@@ -683,7 +683,7 @@ power_attr(unattended_timer);
 //dump dpm device suspend/resume time
 unsigned int gResume_Time = 50000; //50000ns (50ms)
 unsigned int gSuspend_Time = 50000; //50000ns (50ms)
-int alarm_debug = false;
+int alarm_debug = 1;
 EXPORT_SYMBOL_GPL(gResume_Time);
 EXPORT_SYMBOL_GPL(gSuspend_Time);
 EXPORT_SYMBOL_GPL(alarm_debug);

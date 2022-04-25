@@ -29,6 +29,7 @@
 #include <linux/miscdevice.h>
 #include <asm/uaccess.h>
 #include <linux/ioctl.h>
+#include <linux/kernel.h>
 
 /**************************/
 /* Debug and Log System */
@@ -2685,6 +2686,9 @@ static int lightSensor_miscRegister(void)
  *|| Initialization Part ||
  *====================
  */
+#ifdef ASUS_ZS673KS_PROJECT
+extern enum DEVICE_PROJID g_ASUS_prjID;
+#endif
 static int init_data(void)
 {
 	int ret = 0;
@@ -2710,7 +2714,12 @@ static int init_data(void)
 
 	g_ps_data->g_ps_autok_min= g_ALSPS_hw_client->mpsensor_hw->proximity_autok_min;	
 	g_ps_data->g_ps_autok_max = g_ALSPS_hw_client->mpsensor_hw->proximity_autok_max;	
-
+	
+#ifdef ASUS_ZS673KS_PROJECT
+	if(g_ASUS_prjID == PROJECT_ANAKIN_ENTRY || g_ASUS_prjID == PROJECT_ANAKIN_ELITE){ //ANAKIN
+		g_ps_data->g_ps_autok_max = VCNL36866_PROXIMITY_AUTOK_MAX_ANAKIN;
+	}
+#endif
 	g_ps_data->int_counter = 0;
 	g_ps_data->event_counter = 0;
 	g_ps_data->crosstalk_diff = 0;

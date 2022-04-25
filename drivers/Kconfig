@@ -231,7 +231,7 @@ source "drivers/interconnect/Kconfig"
 source "drivers/counter/Kconfig"
 
 # ASUS_BSP_Vibrator +++
-source "drivers/motor/tspdrv/Kconfig"
+source "drivers/motor/aw8697_haptic/Kconfig"
 # ASUS_BSP_Vibrator ---
 
 # ASUS_BSP Deeo: AuraLight

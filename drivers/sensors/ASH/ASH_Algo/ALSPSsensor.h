@@ -104,3 +104,6 @@
 #define CS_IT_50MS (0)
 #endif
 
+extern enum EXTERN_DEVICE_PROJID g_EXTERN_ASUS_prjID;
+#define VCNL36866_PROXIMITY_AUTOK_MAX_ANAKIN       (2200)
+

@@ -188,7 +188,7 @@ obj-$(CONFIG_INTERCONNECT)	+= interconnect/
 obj-$(CONFIG_COUNTER)		+= counter/
 
 #ASUS_BSP Vibrator +++
-obj-$(CONFIG_TSPDRV) += motor/tspdrv/
+obj-$(CONFIG_AW8697_HAPTIC) += motor/aw8697_haptic/
 #ASUS_BSP Vibrator ---
 
 # ASUS_BSP Deeo : AURA SYNC driver
@@ -215,3 +215,5 @@ ifeq ($(ASUS_BUILD_PROJECT),ZS673KS)
 	endif
 endif
 endif
+
+obj-$(CONFIG_ASUS_GLOBAL_VAR)   += platform/asus/

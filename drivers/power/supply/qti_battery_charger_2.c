@@ -865,10 +865,18 @@ static int usb_psy_set_icl(struct battery_chg_dev *bcdev, u32 prop_id, int val)
 		return rc;
 	}
 
+	//[+++]ASUS_BSP : ONLY allow SDP to set ICL
+	#if 0
 	/* Allow this only for SDP or USB_PD and not for other charger types */
 	if (pst->prop[USB_ADAP_TYPE] != POWER_SUPPLY_USB_TYPE_SDP &&
 	    pst->prop[USB_ADAP_TYPE] != POWER_SUPPLY_USB_TYPE_PD)
 		return -EINVAL;
+	#endif
+	if (pst->prop[USB_ADAP_TYPE] != POWER_SUPPLY_USB_TYPE_SDP) {
+		pr_debug("Not SDP. skip to set USB ICL. tpye : %d\n", pst->prop[USB_ADAP_TYPE]);
+		return -EINVAL;
+	}
+	//[---]ASUS_BSP : ONLY allow SDP to set ICL
 
 	/*
 	 * Input current limit (ICL) can be set by different clients. E.g. USB
@@ -926,6 +934,8 @@ static int usb_psy_get_prop(struct power_supply *psy,
 			pr_err("[BAT][CHG] USB_ONLINE=0, but side_cc=%d, btm_cc=%d\n", side_port_cc_status, rt_chg_get_remote_cc());
 			pval->intval = 1;
 		} else if (g_vbus_plug && (feature_stop_chg_flag | g_once_usb_thermal_btm | g_once_usb_thermal_side)) {
+			pval->intval = 1;
+		} else if (g_vbus_plug) {
 			pval->intval = 1;
 		}
 	}

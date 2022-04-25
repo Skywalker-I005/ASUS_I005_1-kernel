@@ -442,7 +442,7 @@ int dongle_type_detect(enum asus_dongle_type *type)
 	{
 		*type = Dongle_NO_INSERT;
 	}
-	else if( 620000 <= pogo_id_voltage && pogo_id_voltage <= 900000) 
+	else if( 620000 <= pogo_id_voltage && pogo_id_voltage <= 780000) 
 	{
 		*type = Dongle_INBOX5;
 	}
@@ -592,11 +592,8 @@ void check_pogo_id_worker(struct work_struct *work)
 			break;
 		}
 		else {
-			if (i == 4) {
-				update_POGO_ID_ADC_Threshold(type);
-				gDongleType = Dongle_NO_INSERT;
-				return;
-			}
+			if (i == 4)
+				break;
 
 			pre_dongletype = type;
 			msleep(100);
@@ -605,6 +602,11 @@ void check_pogo_id_worker(struct work_struct *work)
 	
 	msleep(10);
 	update_POGO_ID_ADC_Threshold(type);
+
+	if (i == 5) {
+		gDongleType = Dongle_NO_INSERT;
+		return;
+	}
 
 	control_pogo_det(type);
 

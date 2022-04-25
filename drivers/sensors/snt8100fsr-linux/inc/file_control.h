@@ -55,6 +55,7 @@ extern void create_Grip_Tap_Sense_En_proc_file(void);
 #ifdef ASUS_ZS673KS_PROJECT
 extern void create_Grip_Cal_Read_proc_file(void);
 #endif
+void create_Grip_ID_status_proc_file(void);
 
 
 //Function: DPC wake from low power mode

@@ -62,7 +62,8 @@ static struct rtc_timer		rtctimer;
 static struct rtc_device	*rtcdev;
 #if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT
 //[PM_debug+++]
-static int alarm_debug_count = 0;
+int alarm_debug_count = 0;
+EXPORT_SYMBOL_GPL(alarm_debug_count);
 extern int alarm_debug;
 //[PM_debug---]
 #endif
@@ -178,11 +179,13 @@ static void alarmtimer_enqueue(struct alarm_base *base, struct alarm *alarm)
 		timerqueue_del(&base->timerqueue, &alarm->node);
 	#if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT
     //[PM_debug+++]
+    /*
     if(alarm_debug){
         pr_info("[PM_debug][alarm]%s: comm:%s pid:%d exp:%llu type:%d func:%pf \n", __func__,
         current->comm, current->pid,
         ktime_to_ms(alarm->node.expires), alarm->type, alarm->function);//This print code could be removed for release build.
     }
+    */
     //[PM_debug---]
 	#endif
 	timerqueue_add(&base->timerqueue, &alarm->node);
@@ -323,20 +326,20 @@ static int alarmtimer_suspend(struct device *dev)
 	if (min == 0)
 		return 0;
 
+	if (ktime_to_ns(min) < 2 * NSEC_PER_SEC) {
 #if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT
     //[PM_debug+++]
-    if (min_timer){
-        if(alarm_debug){
-            pr_info("[PM_debug][alarm]%s: [%p]type=%d, func=%pf, exp:%llu\n", __func__,
-            min_timer, min_timer->type, min_timer->function,
-            ktime_to_ms(min_timer->node.expires));
-            min_timer = NULL;
-        }
-    }
-    alarm_debug_count = 0x1;    
+		if (min_timer){
+			if(alarm_debug){
+				pr_info("[PM_debug][alarm]%s: [%p]type=%d, func=%pf, exp:%llu\n", __func__,
+				min_timer, min_timer->type, min_timer->function,
+				ktime_to_ms(min_timer->node.expires));
+				min_timer = NULL;
+			}
+		}
+		alarm_debug_count = 0x1;    
     //[PM_debug---]
 #endif
-	if (ktime_to_ns(min) < 2 * NSEC_PER_SEC) {
 		__pm_wakeup_event(ws, 2 * MSEC_PER_SEC);
 #if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT
     //[PM_debug+++]        

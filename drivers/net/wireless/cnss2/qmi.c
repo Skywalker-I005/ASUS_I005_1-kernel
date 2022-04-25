@@ -2485,9 +2485,9 @@ static void cnss_wlfw_respond_get_info_ind_cb(struct qmi_handle *qmi_wlfw,
 		return;
 	}
 
-//	cnss_pr_buf("Extract message with event length: %d, type: %d, is last: %d, seq no: %d\n",
-//		    ind_msg->data_len, ind_msg->type,
-//		    ind_msg->is_last, ind_msg->seq_no);
+	//cnss_pr_buf("Extract message with event length: %d, type: %d, is last: %d, seq no: %d\n",
+	//	    ind_msg->data_len, ind_msg->type,
+	//	    ind_msg->is_last, ind_msg->seq_no);
 
 	if (plat_priv->get_info_cb_ctx && plat_priv->get_info_cb)
 		plat_priv->get_info_cb(plat_priv->get_info_cb_ctx,

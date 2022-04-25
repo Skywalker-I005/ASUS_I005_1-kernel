@@ -168,8 +168,12 @@ int upload_firmware_fwd(struct snt8100fsr *snt8100fsr, char *filename) {
 	snt8100fsr_g->chip_reset_flag = GRIP_RST_FW_DL;
 	rst_work->snt8100fsr = snt8100fsr;
 
-	rst_work->filename = FW_PATH;
-		
+	/* ROG5.5 apply 2nd source vendor, id_num=0 should use special firmware */
+	if(gpio_get_value(snt8100fsr_g->snt_id_num) == 1){
+		rst_work->filename = FW_PATH;
+	}else{
+		rst_work->filename = FW_PATH_ID0;
+	}
 	/* [Todo] use vendor/asusfw path by default */
 	/*
 	if(fw_version == 0){
@@ -233,7 +237,12 @@ int upload_firmware(struct snt8100fsr *snt8100fsr, char *filename) {
 	mutex_unlock(&snt8100fsr_g->ap_lock);
 	work->snt8100fsr = snt8100fsr;
 
-	work->filename = FW_PATH;
+	/* ROG5.5 apply 2nd source vendor, id_num=0 should use special firmware */
+	if(gpio_get_value(snt8100fsr_g->snt_id_num) == 1){
+		work->filename = FW_PATH;
+	}else{
+		work->filename = FW_PATH_ID0;
+	}
 	
 	PRINT_INFO("FW file path:%s", work->filename);
 	

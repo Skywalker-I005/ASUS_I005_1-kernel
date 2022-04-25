@@ -666,11 +666,9 @@ static int fts_input_report_b(struct fts_ts_data *data)
             report_rate_recovery(data);
             fts_ex_fun_recovery(data);
             fts_irq_enable();
-/*            if (data->extra_reconfig == 2) 
+            if (data->extra_reconfig == 2) 
                 set_sub_noise_mode(true);
-*/
 	      }
-	      
 /*	      if (data->perftime == 1) {
 		time_delta = ktime_ms_delta(ktime_get(), start);
 		FTS_INFO("touch down to up delta time %llu ms ",time_delta);
@@ -2247,9 +2245,8 @@ static int fts_ts_resume(struct device *dev)
     fp_press = 0;
     asus_game_recovery(ts_data);
     report_rate_recovery(ts_data);
-/*    if (ts_data->extra_reconfig == 2) 
+    if (ts_data->extra_reconfig == 2) 
         set_sub_noise_mode(true);
-*/        
 //    FTS_FUNC_EXIT();
     return 0;
 }

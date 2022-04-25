@@ -526,7 +526,9 @@ void ATR_touch(int id,int action, int x, int y, int random)
 			}
 			if(!fts_data->finger_press) {
                 mutex_lock(&fts_data->report_mutex);
+                
                 report_lock = true;                
+
 				input_mt_slot(input_dev, first_empty_slot + 10);
 				input_mt_report_slot_state(input_dev, MT_TOOL_FINGER, true);
 				input_report_abs(input_dev, ABS_MT_PRESSURE, 0x3f + random_pressure);
@@ -551,11 +553,13 @@ void ATR_touch(int id,int action, int x, int y, int random)
 			
 			if(!fts_data->finger_press)
 			    input_sync(input_dev);
+
             if (report_lock) {
                 mutex_unlock(&fts_data->report_mutex);
                 report_lock = false;
             }
-			touch_figer_slot[first_empty_slot] = id + 1; // save finger id in slot 			
+
+            touch_figer_slot[first_empty_slot] = id + 1; // save finger id in slot 			
 		}
 	} 
 	else //release
@@ -981,18 +985,18 @@ static ssize_t fts_extra_config_store(
         FTS_DEBUG("Reconfig touch size");
     }
     
-/*    if (ts_data->extra_reconfig == 2) {
+    if (ts_data->extra_reconfig == 2) {
         if (!ts_data->sub_noise) {
             FTS_DEBUG("Reconfig touch frequency");
             set_sub_noise_mode(true);
         }
     }
-*/    
+    
     if (ts_data->extra_reconfig == 0) {
         FTS_DEBUG("Exit Extra mode");
-/*        if (ts_data->sub_noise)
+        if (ts_data->sub_noise)
             set_sub_noise_mode(false);
-*/
+
     }
     return count;
 }
@@ -1032,11 +1036,7 @@ void asus_game_recovery(struct fts_ts_data *ts_data)
       }
     }
    
-    if ((slidling_sen == 0x3)&& (sliding_acy == 0x3)&& (touch_acy == 0x3)) {
-//      FTS_INFO("game reg is default ");
-    } else {
 	reconfig_game_reg(true);
-    }
 }
 
 void report_rate_recovery(struct fts_ts_data *ts_data) 

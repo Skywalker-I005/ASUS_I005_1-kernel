@@ -44,6 +44,7 @@
 #include <linux/usb/dwc3-msm.h>
 #include <linux/usb/role.h>
 #include <linux/usb/redriver.h>
+#include <linux/dma-iommu.h>
 #include <linux/gpio.h>
 #ifdef CONFIG_QGKI_MSM_BOOT_TIME_MARKER
 #include <soc/qcom/boot_stats.h>
@@ -69,6 +70,12 @@
 #define USB3_HCSPARAMS1		(0x4)
 #define USB3_PORTSC		(0x420)
 
+#ifdef CONFIG_USB_VD_TEST
+/* force set cc orientation for USBH VD test */
+static int setOrientation;
+module_param(setOrientation, int, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(setOrientation, "cc orientation set");
+#endif
 
 static struct dwc3_msm *context1;
 static struct dwc3_msm *context2;
@@ -338,6 +345,13 @@ enum dwc3_id_state {
 	DWC3_ID_FLOAT,
 };
 
+/* for type c cable */
+enum plug_orientation {
+	ORIENTATION_NONE,
+	ORIENTATION_CC1,
+	ORIENTATION_CC2,
+};
+
 enum msm_usb_irq {
 	HS_PHY_IRQ,
 	PWR_EVNT_IRQ,
@@ -552,6 +566,7 @@ struct dwc3_msm {
 
 	atomic_t                in_p3;
 	unsigned int		lpm_to_suspend_delay;
+	enum plug_orientation	typec_orientation;
 	u32			num_gsi_event_buffers;
 	struct dwc3_event_buffer **gsi_ev_buff;
 	int pm_qos_latency;
@@ -3353,7 +3368,7 @@ static int dwc3_msm_suspend(struct dwc3_msm *mdwc, bool force_power_collapse,
 		dbg_event(0xFF, "pend evt", 0);
 
 	/* disable power event irq, hs and ss phy irq is used as wake up src */
-	disable_irq(mdwc->wakeup_irq[PWR_EVNT_IRQ].irq);
+	disable_irq_nosync(mdwc->wakeup_irq[PWR_EVNT_IRQ].irq);
 
 	dwc3_set_phy_speed_flags(mdwc);
 	/* Suspend HS PHY */
@@ -3585,6 +3600,13 @@ static int dwc3_msm_resume(struct dwc3_msm *mdwc)
 		dwc3_msm_set_pwr_events(mdwc, false);
 		mdwc->lpm_flags &= ~MDWC3_USE_PWR_EVENT_IRQ_FOR_WAKEUP;
 	}
+#ifdef CONFIG_USB_VD_TEST
+	if (setOrientation==1)
+		mdwc->typec_orientation=ORIENTATION_CC1;
+	else if (setOrientation==2)
+		mdwc->typec_orientation=ORIENTATION_CC2;
+	dev_info(mdwc->dev, "[USB] %s: typec_orientation = %d\n", __func__,mdwc->typec_orientation);
+#endif
 	/* Resume SS PHY */
 	if (dwc->maximum_speed >= USB_SPEED_SUPER &&
 			mdwc->lpm_flags & MDWC3_SS_PHY_SUSPEND) {
@@ -3755,8 +3777,8 @@ static void dwc3_ext_event_notify(struct dwc3_msm *mdwc)
 	if (mdwc->vbus_active == true && mdwc->id_state == DWC3_ID_FLOAT) {
 		dev_info(mdwc->dev, "[USB] %s, device mode\n", __func__);
 		if (!strcmp("a800000.ssusb", dev_name(mdwc->dev))) {
-			dev_info(mdwc->dev, "[USB] %s, usb2 redriver enable\n", __func__);
-			redriver_enable(1);
+			dev_info(mdwc->dev, "[USB] %s, usb2 redriver disable\n", __func__);
+			redriver_enable(0);
 		}
 	} else if (mdwc->vbus_active == false && mdwc->id_state == DWC3_ID_GROUND) {
 		dev_info(mdwc->dev, "[USB] %s, host mode\n", __func__);
@@ -3820,6 +3842,7 @@ static void dwc3_resume_work(struct work_struct *w)
 	}
 
 	dwc->maximum_speed = dwc->max_hw_supp_speed;
+	/* Check speed and Type-C polarity values in order to configure PHY */
 
 	if (edev && extcon_get_state(edev, extcon_id)) {
 		ret = extcon_get_property(edev, extcon_id,
@@ -3830,7 +3853,6 @@ static void dwc3_resume_work(struct work_struct *w)
 			dev_info(mdwc->dev, "[USB] %s: maximum_speed: USB_SPEED_HIGH\n", __func__);
 			dwc->maximum_speed = USB_SPEED_HIGH;
 		}
-
 	}
 
 	if (dwc->maximum_speed >= USB_SPEED_SUPER)
@@ -5056,13 +5078,15 @@ int dwc3_msm_release_ss_lane(struct device *dev, bool usb_dp_concurrent_mode)
 	flush_work(&mdwc->resume_work);
 	drain_workqueue(mdwc->sm_usb_wq);
 
-	redriver_release_usb_lanes(mdwc->ss_redriver_node);
 #ifdef ASUS_PICASSO_PROJECT
 	if (dwc->maximum_speed == USB_SPEED_HIGH) {
 		dev_info(dev, "dwc3 high speed skip release ss lane.\n");
 		return 0;
 	}
 #endif
+
+	redriver_release_usb_lanes(mdwc->ss_redriver_node);
+
 	mdwc->ss_release_called = true;
 	if (mdwc->id_state == DWC3_ID_GROUND) {
 		/* stop USB host mode */
@@ -5252,6 +5276,9 @@ static int dwc3_msm_probe(struct platform_device *pdev)
 	mdwc->use_pdc_interrupts = of_property_read_bool(node,
 				"qcom,use-pdc-interrupts");
 	dwc3_set_notifier(&dwc3_msm_notify_event);
+
+	if (of_property_read_bool(node, "qcom,iommu-best-fit-algo"))
+		iommu_dma_enable_best_fit_algo(dev);
 
 	if (dma_set_mask_and_coherent(dev, DMA_BIT_MASK(64))) {
 		dev_err(&pdev->dev, "setting DMA mask to 64 failed.\n");
@@ -5851,6 +5878,7 @@ static int dwc3_otg_start_host(struct dwc3_msm *mdwc, int on)
 		if (!strcmp("a800000.dwc3", dev_name(&mdwc->dwc3->dev)) ){
 			usb2_host_mode=1;
 		}
+
 		if (!dwc->dis_u3_susphy_quirk) {
 			dwc3_msm_write_reg_field(mdwc->base, DWC3_GUSB3PIPECTL(0),
 					DWC3_GUSB3PIPECTL_SUSPHY, 1);
@@ -6234,10 +6262,10 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 		if (test_bit(ID, &mdwc->inputs) &&
 				!test_bit(B_SESS_VLD, &mdwc->inputs)) {
 			dbg_event(0xFF, "undef_id_!bsv", 0);
+			dwc3_msm_resume(mdwc);
 			pm_runtime_set_active(mdwc->dev);
 			pm_runtime_enable(mdwc->dev);
 			pm_runtime_get_noresume(mdwc->dev);
-			dwc3_msm_resume(mdwc);
 			pm_runtime_put_sync(mdwc->dev);
 			dbg_event(0xFF, "Undef NoUSB",
 				atomic_read(&mdwc->dev->power.usage_count));

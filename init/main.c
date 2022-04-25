@@ -504,11 +504,80 @@ __setup("androidboot.country_code=", check_country_code);
 #endif //ASUS_SAKE_PROJECT || ASUS_VODKA_PROJECT
 
 #ifdef ASUS_ZS673KS_PROJECT
+enum DEVICE_PROJID g_ASUS_prjID = PROJECT_INVALID;
+EXPORT_SYMBOL(g_ASUS_prjID);
+static int set_project_id(char *str)
+{
+        if ( strcmp("0", str) == 0 )
+        {
+                g_ASUS_prjID = PROJECT_ANAKIN_ENTRY;
+                printk("Kernel PROJECT ID = PROJECT_ANAKIN_ENTRY (0)\n");
+        }else if ( strcmp("1", str) == 0 )
+        {
+                g_ASUS_prjID = PROJECT_ANAKIN_ELITE;
+                printk("Kernel PROJECT ID = PROJECT_ANAKIN_ENTRY (1)\n");
+        }else if ( strcmp("2", str) == 0 )
+        {
+                g_ASUS_prjID = PROJECT_PICASSO;
+                printk("Kernel PROJECT ID = PROJECT_PICASSO (2)\n");
+        }else if ( strcmp("9", str) == 0 )
+        {
+                g_ASUS_prjID = PROJECT_ANAKIN2_ERC_ARUA;
+                printk("Kernel PROJECT ID = PROJECT_ANAKIN2_ERC_ARUA (9)\n");
+        }else if ( strcmp("A", str) == 0 )
+        {
+                g_ASUS_prjID = PROJECT_ANAKIN2_ERC_POMLED;
+                printk("Kernel PROJECT ID = PROJECT_ANAKIN2_ERC_POMLED (10)\n");
+        }else if ( strcmp("B", str) == 0 )
+        {
+                g_ASUS_prjID = PROJECT_ANAKIN2_ERA;
+                printk("Kernel PROJECT ID = PROJECT_ANAKIN2_ERA (11)\n");
+        }else if ( strcmp("C", str) == 0 )
+        {
+                g_ASUS_prjID = PROJECT_ANAKIN2_ARUA;
+                printk("Kernel PROJECT ID = PROJECT_ANAKIN2_ARUA (12)\n");
+        }else if ( strcmp("D", str) == 0 )
+        {
+                g_ASUS_prjID = PROJECT_ANAKIN2_POMLED;
+                printk("Kernel PROJECT ID = PROJECT_ANAKIN2_POMLED (13)\n");
+        }else if ( strcmp("E", str) == 0 )
+        {
+                g_ASUS_prjID = PROJECT_ANAKIN2_PX_ARUA;
+                printk("Kernel PROJECT ID = PROJECT_ANAKIN2_PX_ARUA (14)\n");
+        }else if ( strcmp("F", str) == 0 )
+        {
+                g_ASUS_prjID = PROJECT_ANAKIN2_PX_POMLED;
+                printk("Kernel PROJECT ID = PROJECT_ANAKIN2_PX_POMLED (15)\n");
+        }
+        printk("g_Asus_prjID = %d\n", g_ASUS_prjID);
+        return 0;
+}
+__setup("androidboot.id.prj=", set_project_id);
 
 enum DEVICE_HWID g_ASUS_hwID = HW_REV_INVALID;
 EXPORT_SYMBOL(g_ASUS_hwID);
 static int set_hardware_id(char *str)
 {
+	if (g_ASUS_prjID >= 9){
+	       if ( strcmp("0", str) == 0 )
+		{
+		        g_ASUS_hwID = HW_REV_ANAKIN2_ER;
+		        printk("Kernel HW ID = ANAKIN2_ER\n");
+		}
+		 else if ( strcmp("1", str) == 0 )
+		{
+		        g_ASUS_hwID = HW_REV_ANAKIN2_PR;
+		        printk("Kernel HW ID = ANAKIN2_PR\n");
+		}
+		else if ( strcmp("2", str) == 0 )
+		{
+		        g_ASUS_hwID = HW_REV_ANAKIN2_MP;
+		        printk("Kernel HW ID = ANAKIN2_MP\n");
+		}
+		printk("g_Asus_hwID = %d\n", g_ASUS_hwID);
+		return 0;
+	}
+
         if ( strcmp("0", str) == 0 )
         {
                 g_ASUS_hwID = HW_REV_EVB;
@@ -637,6 +706,27 @@ __setup("androidboot.id.sec_disp=", set_sec_disp_id);
 #endif //ASUS_ZS673KS_PROJECT
 
 #ifdef ASUS_PICASSO_PROJECT
+enum DEVICE_PROJID g_ASUS_prjID = PROJECT_INVALID;
+EXPORT_SYMBOL(g_ASUS_prjID);
+static int set_project_id(char *str)
+{
+        if ( strcmp("0", str) == 0 )
+        {
+                g_ASUS_prjID = PROJECT_ANAKIN_ENTRY;
+                printk("Kernel PROJECT ID = PROJECT_ANAKIN_ENTRY (0)\n");
+        }else if ( strcmp("1", str) == 0 )
+        {
+                g_ASUS_prjID = PROJECT_ANAKIN_ELITE;
+                printk("Kernel PROJECT ID = PROJECT_ANAKIN_ENTRY (1)\n");
+        }else if ( strcmp("2", str) == 0 )
+        {
+                g_ASUS_prjID = PROJECT_PICASSO;
+                printk("Kernel PROJECT ID = PROJECT_PICASSO (2)\n");
+        }
+        printk("g_Asus_prjID = %d\n", g_ASUS_prjID);
+        return 0;
+}
+__setup("androidboot.id.prj=", set_project_id);
 
 enum DEVICE_HWID g_ASUS_hwID = HW_REV_INVALID;
 EXPORT_SYMBOL(g_ASUS_hwID);
@@ -691,28 +781,6 @@ __setup("androidboot.id.stage=", set_hardware_id);
 #endif //ASUS_PICASSO_PROJECT
 
 #if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT
-enum DEVICE_PROJID g_ASUS_prjID = PROJECT_INVALID;
-EXPORT_SYMBOL(g_ASUS_prjID);
-static int set_project_id(char *str)
-{
-        if ( strcmp("0", str) == 0 )
-        {
-                g_ASUS_prjID = PROJECT_ANAKIN_ENTRY;
-                printk("Kernel PROJECT ID = PROJECT_ANAKIN_ENTRY (0)\n");
-        }else if ( strcmp("1", str) == 0 )
-        {
-                g_ASUS_prjID = PROJECT_ANAKIN_ELITE;
-                printk("Kernel PROJECT ID = PROJECT_ANAKIN_ENTRY (1)\n");
-        }else if ( strcmp("2", str) == 0 )
-        {
-                g_ASUS_prjID = PROJECT_PICASSO;
-                printk("Kernel PROJECT ID = PROJECT_PICASSO (2)\n");
-        }
-        printk("g_Asus_prjID = %d\n", g_ASUS_prjID);
-        return 0;
-}
-__setup("androidboot.id.prj=", set_project_id);
-
 enum DEVICE_SKUID g_ASUS_skuID = SKU_ID_INVALID;
 EXPORT_SYMBOL(g_ASUS_skuID);
 static int set_sku_id(char *str)

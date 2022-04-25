@@ -39,7 +39,7 @@
 			qcom,supply-max-voltage = <3000000>;
 			qcom,supply-enable-load = <10000>;
 			qcom,supply-disable-load = <0>;
-			qcom,supply-post-on-sleep = <0>;
+			qcom,supply-post-on-sleep = <10>;
 			qcom,supply-pre-off-sleep = <10>;
 		};
 	};
@@ -270,11 +270,11 @@
 	qcom,clk-freq-out = <400000>;
 
 	nq@28 {
-		compatible = "qcom,sn-nci";
+		compatible = "nxp,pn544";
 		reg = <0x29>;
-		qcom,sn-irq = <&tlmm 87 0x00>;
-		qcom,sn-ven = <&tlmm 62 0x00>;
-		qcom,sn-firm = <&tlmm 86 0x00>;
+		nxp,pn544-irq = <&tlmm 87 0x00>;
+		nxp,pn544-ven = <&tlmm 62 0x00>;
+		nxp,pn544-fw-dwnld = <&tlmm 86 0x00>;
 		qcom,sn-clkreq = <&tlmm 63 0x00>;
 		interrupt-parent = <&tlmm>;
 		interrupts = <87 0>;
@@ -797,7 +797,7 @@
 		reg = <0x4e>;
 		rt1711,irq_pin = <&tlmm 118 0x00>;
 		rt-dual,supported_modes = <0>; /* 0: dfp/ufp, 1: dfp, 2: ufp */
-		rt-tcpc,name = "type_c_port0"; /* tcpc_device's name */
+		rt-tcpc,name = "typec"; /* tcpc_device's name */
 		rt-tcpc,role_def = <4>; /* 0: SNK Only, 1: SRC Only, 2: DRP, 3: Try.SRC, 4: Try.SNK */
 		rt-tcpc,rp_level = <0>; /* 0: Default, 1: 1.5, 2: 3.0 */
 		rt-tcpc,vconn_supply  = <1>;  /* 0: Never, 1: Always, 2: EMarkOnly, 3: StartOnly */

@@ -227,11 +227,8 @@ struct xt_table {
 	unsigned int valid_hooks;
 
 	/* Man behind the curtain... */
-#if defined(ASUS_ZS673KS_PROJECT) || defined(ASUS_PICASSO_PROJECT) || defined(ASUS_SAKE_PROJECT) || defined(ASUS_VODKA_PROJECT)
-	struct xt_table_info __rcu *private;
-#else
-        struct xt_table_info *private;
-#endif
+	struct xt_table_info *private;
+
 	/* Set this to THIS_MODULE if you are a module, otherwise NULL */
 	struct module *me;
 
@@ -450,9 +447,6 @@ xt_get_per_cpu_counter(struct xt_counters *cnt, unsigned int cpu)
 }
 
 struct nf_hook_ops *xt_hook_ops_alloc(const struct xt_table *, nf_hookfn *);
-
-struct xt_table_info
-*xt_table_get_private_protected(const struct xt_table *table);
 
 #ifdef CONFIG_COMPAT
 #include <net/compat.h>

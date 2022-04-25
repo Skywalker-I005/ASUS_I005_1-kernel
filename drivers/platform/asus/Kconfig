@@ -5,6 +5,12 @@ config MACH_ASUS
 	help
 	  Support for Asus products
 
+config ASUS_GLOBAL_VAR
+	tristate "ASUS global variables driver"
+	help
+	 Say yes here to support the ASUS global variables driver. This driver
+         provides export functions about the global variables for other module.
+
 config MACH_ASUS_LAHAINA
 	bool "Asus LAHAINA"
 	depends on ARCH_LAHAINA
@@ -39,4 +45,3 @@ config MACH_ASUS_VODKA
 	  Support for Vodka
 
 endmenu
-

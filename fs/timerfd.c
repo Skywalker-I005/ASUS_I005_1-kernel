@@ -29,6 +29,7 @@
 
 #if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT
 //[PM_debug+++]
+extern int alarm_debug_count;
 extern int alarm_debug;
 //[PM_debug---]
 #endif
@@ -246,7 +247,7 @@ static __poll_t timerfd_poll(struct file *file, poll_table *wait)
 		events |= EPOLLIN;
 #if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT	
     //[PM_debug+++]
-    if(alarm_debug){
+    if(alarm_debug && alarm_debug_count){
         //printk("[PM_debug]%s +++", __func__);
         if (ctx->expired && isalarm(ctx))
             pr_info("[PM_debug]%s: comm:%s pid:%d exp:%llu type:%d\n", __func__,

@@ -112,6 +112,7 @@
 
 // The location on disk of the firmware to upload to the hardware on boot
 #define FW_PATH   "/vendor/etc/grip_fw/snt8100fsr.image"
+#define FW_PATH_ID0   "/vendor/etc/grip_fw/snt8100fsr.image_id0"
 
 /* ASUS BSP Clay: load different fw version according to HWID +++ */
 #define ER_FW_PATH   "/vendor/etc/grip_fw/snt8100fsr.image_2.12.43"

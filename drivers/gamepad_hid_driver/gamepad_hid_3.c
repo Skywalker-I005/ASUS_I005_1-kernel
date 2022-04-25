@@ -323,6 +323,22 @@ static ssize_t fw_ver_show(struct device *dev, struct device_attribute *attr,cha
 	return snprintf(buf, PAGE_SIZE,"0x%x\n", data);
 }
 
+static ssize_t left_fw_ver_show(struct device *dev, struct device_attribute *attr,char *buf)
+{
+	struct hid_device *hdev;
+	struct usb_interface *intf;
+	char left_fw_ver[7];
+	
+	hdev = gamepad_hidraw->hid;
+	intf = to_usb_interface(hdev->dev.parent);
+	memset(left_fw_ver, 0, 7);
+	memcpy(left_fw_ver, interface_to_usbdev(intf)->serial, 6);
+	left_fw_ver[7] = '\0';
+	printk("[GAMEPAD_III] left_fw_version : %s\n", left_fw_ver);
+	
+	return snprintf(buf, PAGE_SIZE,"%s\n", left_fw_ver);
+}
+
 static ssize_t middle_fw_ver_show(struct device *dev, struct device_attribute *attr,char *buf)
 {
 	unsigned char data[3] = {0};
@@ -360,6 +376,30 @@ static ssize_t bt_fw_ver_show(struct device *dev, struct device_attribute *attr,
 
 	printk("[GAMEPAD_III] BT FW version : V%x.%x.%x\n", data[0], data[1], data[2]);
 	return snprintf(buf, PAGE_SIZE,"V%x.%x.%x\n", data[0], data[1], data[2]);
+}
+
+static ssize_t generation_show(struct device *dev, struct device_attribute *attr,char *buf)
+{
+	int generation = 3;
+	
+	printk("[GAMEPAD_III] generation : %d\n", generation);
+	return snprintf(buf, PAGE_SIZE,"%d", generation);
+}
+
+static ssize_t type_show(struct device *dev, struct device_attribute *attr,char *buf)
+{
+	if (gamepad_hidraw->hid->product == 0x7904) {
+		printk("[GAMEPAD_III] type : %s\n", "KunaiIII_Bumper");
+		return snprintf(buf, PAGE_SIZE,"%s", "KunaiIII_Bumper");
+	}
+	else if (gamepad_hidraw->hid->product == 0x7905) {
+		printk("[GAMEPAD_III] type : %s\n", "KunaiIII_Holder");
+		return snprintf(buf, PAGE_SIZE,"%s", "KunaiIII_Holder");
+	}
+	else {
+		printk("[GAMEPAD_III] type : %s\n", "none");
+		return snprintf(buf, PAGE_SIZE,"%s", "none");
+	}
 }
 
 static ssize_t fw_mode_show(struct device *dev, struct device_attribute *attr,char *buf)
@@ -838,9 +878,12 @@ static DEVICE_ATTR(frame, 0664, frame_show, frame_store);
 static DEVICE_ATTR(mode2, 0664, mode2_show, mode2_store);
 static DEVICE_ATTR(led_on, 0664, led_on_show, led_on_store);
 static DEVICE_ATTR(speed, 0664, speed_show, speed_store);
+static DEVICE_ATTR(left_fw_ver, 0664, left_fw_ver_show, NULL);
 static DEVICE_ATTR(middle_fw_ver, 0664, middle_fw_ver_show, NULL);
 static DEVICE_ATTR(right_fw_ver, 0664, right_fw_ver_show, NULL);
 static DEVICE_ATTR(bt_fw_ver, 0664, bt_fw_ver_show, NULL);
+static DEVICE_ATTR(generation, 0664, generation_show, NULL);
+static DEVICE_ATTR(type, 0664, type_show, NULL);
 
 static struct attribute *pwm_attrs[] = {
 	&dev_attr_red_pwm.attr,
@@ -854,9 +897,12 @@ static struct attribute *pwm_attrs[] = {
 	&dev_attr_mode2.attr,
 	&dev_attr_led_on.attr,
 	&dev_attr_speed.attr,
+	&dev_attr_left_fw_ver.attr,
 	&dev_attr_middle_fw_ver.attr,
 	&dev_attr_right_fw_ver.attr,
 	&dev_attr_bt_fw_ver.attr,
+	&dev_attr_generation.attr,
+	&dev_attr_type.attr,
 	NULL
 };
 

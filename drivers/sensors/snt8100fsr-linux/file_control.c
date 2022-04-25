@@ -4655,5 +4655,33 @@ void create_Grip_Cal_Read_proc_file(void)
 	return;
 }
 #endif
+static int Grip_ID_status_proc_read(struct seq_file *buf, void *v)
+{
+	seq_printf(buf, "%d\n", gpio_get_value(snt8100fsr_g->snt_id_num));
+	return 0;
+}
+
+static int Grip_ID_status_proc_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, Grip_ID_status_proc_read, NULL);
+}
+
+void create_Grip_ID_status_proc_file(void)
+{
+	static const struct file_operations proc_fops = {
+		.owner = THIS_MODULE,
+		.open = Grip_ID_status_proc_open,
+		.read = seq_read,
+		.release = single_release,
+	};
+	struct proc_dir_entry *proc_file = 
+	proc_create("driver/grip_id_status", 0444, NULL, &proc_fops);
+
+	if (!proc_file) {
+		PRINT_CRIT("[Proc]%s failed!\n", __FUNCTION__);
+	}
+	return;
+}
+
 /*************** ASUS BSP Clay: proc file --- *******************/
 

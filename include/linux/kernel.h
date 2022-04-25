@@ -28,32 +28,42 @@
 #if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT
 enum DEVICE_HWID
 {
-       HW_REV_INVALID 	= -1,
-       HW_REV_EVB    		= 0,
-       HW_REV_EVB2   		= 1,
-       HW_REV_SR     		= 2,
-       HW_REV_ER     		= 3,
-       HW_REV_ER2    		= 4,
-       HW_REV_PR     		= 5,
-       HW_REV_PR2    		= 6,
-       HW_REV_MP     		= 7,
-       HW_REV_MP3    		= 8,
-       HW_REV_MP4    		= 9,
-       HW_REV_MP5    		= 10,
-       HW_REV_MP6    		= 11,
-       HW_REV_MP7    		= 12,
-       HW_REV_MP8    		= 13,
-       HW_REV_MP9    		= 14,
-       HW_REV_MP10   		= 15
+       HW_REV_INVALID 	         = -1,
+       HW_REV_EVB    		 =  0,
+       HW_REV_EVB2   		 =  1,
+       HW_REV_SR     		 =  2,
+       HW_REV_ER     		 =  3,
+       HW_REV_ER2    		 =  4,
+       HW_REV_PR     		 =  5,
+       HW_REV_PR2    		 =  6,
+       HW_REV_MP     		 =  7,
+       HW_REV_MP3    		 =  8,
+       HW_REV_MP4    		 =  9,
+       HW_REV_MP5    		 = 10,
+       HW_REV_MP6    		 = 11,
+       HW_REV_MP7    		 = 12,
+       HW_REV_MP8    		 = 13,
+       HW_REV_MP9    		 = 14,
+       HW_REV_MP10   		 = 15,
+       HW_REV_ANAKIN2_ER         = 20,
+       HW_REV_ANAKIN2_PR         = 21,
+       HW_REV_ANAKIN2_MP         = 22
 };
 extern enum DEVICE_HWID g_ASUS_hwID;
 
 enum DEVICE_PROJID
 {
-       PROJECT_INVALID = -1,
-       PROJECT_ANAKIN_ENTRY = 0,
-       PROJECT_ANAKIN_ELITE = 1,
-       PROJECT_PICASSO	    = 2
+       PROJECT_INVALID           = -1,
+       PROJECT_ANAKIN_ENTRY      =  0,
+       PROJECT_ANAKIN_ELITE      =  1,
+       PROJECT_PICASSO	         =  2,
+       PROJECT_ANAKIN2_ERC_ARUA  =  9,
+       PROJECT_ANAKIN2_ERC_POMLED= 10,
+       PROJECT_ANAKIN2_ERA       = 11,
+       PROJECT_ANAKIN2_ARUA      = 12,
+       PROJECT_ANAKIN2_POMLED    = 13,
+       PROJECT_ANAKIN2_PX_ARUA   = 14,
+       PROJECT_ANAKIN2_PX_POMLED = 15
 };
 extern enum DEVICE_PROJID g_ASUS_prjID;
 

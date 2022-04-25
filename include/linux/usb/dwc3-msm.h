@@ -86,9 +86,9 @@ enum gsi_ep_op {
 	u8 ep_intr_num;
 	struct sg_table sgt_trb_xfer_ring;
 	struct sg_table sgt_data_buff;
-	struct device *dev;
+	struct device *dev;	
 	bool use_tcm_mem;
-	struct llcc_tcm_data *tcm_mem;
+	struct llcc_tcm_data *tcm_mem;	
 };
 #else
 struct usb_gsi_request {

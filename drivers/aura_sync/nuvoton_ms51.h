@@ -11,7 +11,6 @@
 #include <linux/pinctrl/consumer.h>
 #include <linux/mutex.h>
 #include <linux/kernel.h>
-#include "aura_wakelock.h"
 
 #define FAN_ADD 1
 
@@ -67,9 +66,6 @@ struct ms51_platform_data {
 	struct work_struct			init_work;
 
 	struct i2c_client *client;
-
-	// wake lock for resume work queue
-	struct wake_lock	aura_wake_lock;
 
 	#if FAN_ADD
 

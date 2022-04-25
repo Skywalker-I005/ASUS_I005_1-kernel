@@ -99,8 +99,8 @@ obj-$(CONFIG_QTI_BATTERY_CHARGER)	+= qti_battery_charger.o qti_battery_charge_no
 else ifeq ($(CONFIG_MACH_ASUS_ZS673KS),y)
 obj-$(CONFIG_QTI_BATTERY_CHARGER)	+= qti_battery_charger_main.o
 qti_battery_charger_main-y += qti_battery_charger_2.o asus_battery_charger.o qti_battery_charge_notify.o qti_typec_class.o
-#else ifeq ($(CONFIG_MACH_ASUS_PICASSO),y)
-#obj-$(CONFIG_ASUS_BATTERY_CHARGER)	+= qti_battery_charger_2.o asus_battery_charger.o qti_battery_charge_notify.o
+#obj-$(CONFIG_QTI_BATTERY_CHARGER)	+= qti_battery_charger_main.o
+#qti_battery_charger_main-y += qti_battery_charger_2.o asus_battery_charger.o qti_battery_charge_notify.o qti_typec_class.o
 else
 obj-$(CONFIG_QTI_BATTERY_CHARGER)	+= qti_battery_charger_main.o
 qti_battery_charger_main-y += qti_battery_charger.o qti_typec_class.o

@@ -47,7 +47,7 @@ void set_vaild_length(int level)
 {
   int ret = 0;
 
-  FTS_INFO("set vaild length %d",level);
+  FTS_DEBUG("set vaild length %d",level);
   
   if (level == 0)
       ret = fts_write_reg(SET_GESTURE_LEN_REG,INIT_LENGTH);
@@ -59,7 +59,7 @@ void set_vaild_length(int level)
       ret = fts_write_reg(SET_GESTURE_LEN_REG,LENGTH_3);
 
   if (ret< 0 ) {
-    FTS_INFO("set vaild length fai;");
+    FTS_DEBUG("set vaild length fail");
     return;
   }    
 }
@@ -97,11 +97,11 @@ static ssize_t asus_ex_proc_bktp_gesture_write(struct file *filp, const char *bu
 		return -EFAULT;
 
 	if (strncmp(messages, "0", 1) == 0) {
-	    FTS_DEBUG("Back touch gesture mode disable");
+	    FTS_INFO("Rear touch disable");
 	    fts_data->asus_gesture_en = DISABLE;
 	    fts_ts_suspend_resume(true); // suspend to power off
 	} else {
-	    FTS_DEBUG("Back touch gesture mode enable");
+	    FTS_INFO("Rear touch enable");
 	    fts_data->asus_gesture_en = ENABLE;
 	    asus_gesture_resume(true); //resume into active mode
 	    set_vaild_length(fts_data->vaild_len);
@@ -143,7 +143,7 @@ static ssize_t asus_ex_proc_bktp_gesture_len_write(struct file *filp, const char
 	if (copy_from_user(messages, buff, len))
 		return -EFAULT;
 	
-	FTS_INFO("read messages %s",messages);
+	FTS_DEBUG("read messages %s",messages);
 	
 	if (strncmp(messages, "0", 0) == 0) {
 	  fts_data->vaild_len = 0;

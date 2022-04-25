@@ -17,7 +17,7 @@ extern phys_addr_t RTB_BUFFER_PA;
 #define PRINTK_BUFFER_SLOT2     ((void *)((ulong)PRINTK_BUFFER_VA + (ulong)PRINTK_BUFFER_SLOT_SIZE))
 
 #define PHONE_HANG_LOG_BUFFER   ((void *)((ulong)PRINTK_BUFFER_VA + (ulong)2*PRINTK_BUFFER_SLOT_SIZE ) - (ulong)0x3FC00)
-#define PHONE_HANG_LOG_SIZE     (SZ_1M + PRINTK_BUFFER_SLOT_SIZE*2 + 0x3FC00)
+#define PHONE_HANG_LOG_SIZE     (SZ_1M + PRINTK_BUFFER_SLOT_SIZE*2 + 0x3FC00 + SZ_8K)
 
 /* ASUS_BSP Paul +++ */
 #define LOGCAT_BUFFER_PA        ((void *)((ulong)PRINTK_BUFFER_PA + (ulong)SZ_2M + (ulong)SZ_1M ))

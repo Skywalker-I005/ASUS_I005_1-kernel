@@ -89,7 +89,7 @@ static void rt1715_send_rdo(struct work_struct *work);
 #define MSG_TYPE_ADSP_RT_NOTIFY		0xF1
 //Opcode
 #define MSG_OPCODE_RT_PDO		0xF2
-#define MSG_OPCODE_RT_VID		0xF3
+#define MSG_OPCODE_RT_CUST_SRC	0xF3
 #define MSG_OPCODE_RT_RDO		0xF4
 #define MSG_OPCODE_RT_APSD		0xF5
 #define MSG_OPCODE_RT_SIDE_OTG	0xF6
@@ -107,10 +107,9 @@ struct rt1715_pdo_resp_msg {
 	u32	vid;
 };
 
-struct rt1715_vid_resp_msg {
+struct rt1715_cust_src_resp_msg {
 	struct pmic_glink_hdr	hdr;
-	u8	tcpc_pd_state;
-	u32	vid;
+	u8 cust_src;
 };
 
 struct rt1715_apsd_resp_msg {
@@ -145,7 +144,7 @@ struct rt1715_rdo_resp_msg {
 int rt_chg_get_remote_cc(void) {
     struct tcpc_device *tcpc;
     int result, cc1, cc2;
-    tcpc = tcpc_dev_get_by_name("type_c_port0");
+    tcpc = tcpc_dev_get_by_name("typec");
 
 	if (tcpci_get_cc(tcpc) < 0)
 	{
@@ -187,7 +186,7 @@ EXPORT_SYMBOL(rt_chg_check_asus_vid);
 
 int rt_chg_get_during_swap(void) {
     struct tcpc_device *tcpc;
-    tcpc = tcpc_dev_get_by_name("type_c_port0");
+    tcpc = tcpc_dev_get_by_name("typec");
 
     pr_info("%s: during swap = %d\n", __func__, tcpc->pd_port.pe_data.during_swap);
     return tcpc->pd_port.pe_data.during_swap;
@@ -196,7 +195,7 @@ EXPORT_SYMBOL(rt_chg_get_during_swap);
 
 int typec_disable_function(bool disable) {
     struct tcpc_device *tcpc;
-    tcpc = tcpc_dev_get_by_name("type_c_port0");
+    tcpc = tcpc_dev_get_by_name("typec");
 
     tcpm_typec_disable_function(tcpc, disable);
     pr_info("%s enter, disable= %d\n", __func__, disable);
@@ -275,7 +274,7 @@ static int rt_chg_handle_source_vbus(struct tcp_notify *tcp_noti)
 	//val.intval = enable;
 	//chg->desc->set_property(chg, POWER_SUPPLY_PROP_ONLINE, &val);
 
-	//tcpc = tcpc_dev_get_by_name("type_c_port0");
+	//tcpc = tcpc_dev_get_by_name("typec");
 	//if (!tcpc)
 		//return -EINVAL;
 
@@ -417,7 +416,7 @@ void rt1715_pdo_notify(void) {
 	struct tcpc_device *tcpc;
 
 	//get pdo +++
-	tcpc = tcpc_dev_get_by_name("type_c_port0");
+	tcpc = tcpc_dev_get_by_name("typec");
 	ret = tcpm_get_remote_power_cap(tcpc, &remote_cap);
 	if(ret < 0) {
 		pr_info("%s: Get remote power cap fail, error number = %d\n", __func__, ret);
@@ -445,22 +444,6 @@ void rt1715_pdo_notify(void) {
 
 void rt1715_vid_notify(void) {
 
-	int rc = -1;
-	struct rt1715_vid_resp_msg rt1715_vid_msg = {};
-
-	rt1715_vid_msg.hdr.owner = MSG_OWNER_RT;
-	rt1715_vid_msg.hdr.type = MSG_TYPE_RT_ADSP_NOTIFY;
-	rt1715_vid_msg.hdr.opcode = MSG_OPCODE_RT_VID;
-	rt1715_vid_msg.tcpc_pd_state = tcpc_pd_state;
-	rt1715_vid_msg.vid = vid_ext;
-
-	//pr_info("[USB] %s vid = 0x%04x\n", __func__, rt1715_vid_msg.vid);
-	rc = rt1715_glink_write(g_info, &rt1715_vid_msg, sizeof(rt1715_vid_msg));
-	if (rc < 0) {
-		pr_err("Error in sending message rc=%d\n", rc);
-		return;
-	}
-
 	if (quickchg_extcon == NULL){
 		pr_info("%s: quickchg_extcon not ready\n", __func__);
 		return;
@@ -474,6 +457,24 @@ void rt1715_vid_notify(void) {
 
 	pr_info("%s: vid_ext = 0x%04x pre_vid_ext = 0x%04x\n", __func__, vid_ext, pre_vid_ext);
 	pre_vid_ext = vid_ext;
+
+}
+
+static void rt1715_cust_src_notify(u8 enable) {
+
+	int rc = -1;
+	struct rt1715_cust_src_resp_msg rt1715_cust_src_msg = {};
+
+	rt1715_cust_src_msg.hdr.owner = MSG_OWNER_RT;
+	rt1715_cust_src_msg.hdr.type = MSG_TYPE_RT_ADSP_NOTIFY;
+	rt1715_cust_src_msg.hdr.opcode = MSG_OPCODE_RT_CUST_SRC;
+	rt1715_cust_src_msg.cust_src = enable;
+
+	rc = rt1715_glink_write(g_info, &rt1715_cust_src_msg, sizeof(rt1715_cust_src_msg));
+	if (rc < 0) {
+		pr_err("Error in sending message rc=%d\n", rc);
+		return;
+	}
 
 }
 
@@ -510,7 +511,7 @@ static int chg_tcp_notifer_call(struct notifier_block *nb,
 	uint32_t vdos[VDO_MAX_NR];
 	int ret = 0;
 	
-	tcpc = tcpc_dev_get_by_name("type_c_port0");
+	tcpc = tcpc_dev_get_by_name("typec");
 
 	pr_info("%s: %d\n", __func__, (int)event);
 
@@ -553,14 +554,10 @@ static int chg_tcp_notifer_call(struct notifier_block *nb,
 			}
 			break;
 		case PD_CONNECT_PE_READY_SNK_APDO:
-			dpm_flags = tcpm_inquire_dpm_flags(tcpc);
-			info->peer_usb_comm = (dpm_flags &= DPM_FLAGS_PARTNER_USB_COMM);
-			pr_info("%s tcpc_pd_state = PD_CONNECT_PE_READY_SNK_APDO, USB_COMM = %d\n", __func__, info->peer_usb_comm);
+			pr_info("%s tcpc_pd_state = PD_CONNECT_PE_READY_SNK_APDO\n", __func__);
 			/* TODO: pps event */
 			rt1715_pdo_notify();
 			rt1715_vid_notify();
-			if (info->peer_usb_comm && tcpc_pre_typec_state == TYPEC_UNATTACHED)
-				rt1715_dwc3_msm_usb_set_role(USB_ROLE_DEVICE);
 			break;
 		case PD_CONNECT_NONE:
 			pr_info("%s tcpc_pd_state = PD_CONNECT_NONE\n", __func__);
@@ -645,6 +642,18 @@ static int chg_tcp_notifer_call(struct notifier_block *nb,
 			ret = asus_set_invalid_audio_dongle(2, 0);
 		}
 		//analog audio dongle ---
+
+		//Huawei 3A Rp/Rp cable +++
+		if (tcpc_typec_state == TYPEC_ATTACHED_CUSTOM_SRC) {
+			pr_info("%s tcpc_typec_state = TYPEC_ATTACHED_CUSTOM_SRC\n", __func__);
+			rt1715_cust_src_notify(1);
+		}
+		else if (tcpc_pre_typec_state == TYPEC_ATTACHED_CUSTOM_SRC) {
+			pr_info("%s tcpc_pre_typec_state = TYPEC_ATTACHED_CUSTOM_SRC\n", __func__);
+			rt1715_cust_src_notify(0);
+		}
+		//Huawei 3A Rp/Rp cable ---
+
 		break;
 	default:
 		pr_info("%s TCP_NOTIFY_DEFAULT, event = %d\n", __func__, (int)event);
@@ -701,7 +710,7 @@ static void handle_message(struct rt_charger_info *info, void *data,
 {
 	struct rt1715_resp_msg *resp_msg = data;
 	struct rt1715_pdo_resp_msg *adsp_pdo_msg;
-	struct rt1715_vid_resp_msg *adsp_vid_msg;
+	struct rt1715_cust_src_resp_msg *adsp_cust_src_msg;
 	struct rt1715_rdo_resp_msg *adsp_rdo_msg;
 	struct rt1715_apsd_resp_msg *adsp_apsd_msg;
 	struct rt1715_side_otg_resp_msg *adsp_side_otg_msg;
@@ -713,21 +722,23 @@ static void handle_message(struct rt_charger_info *info, void *data,
 		if (len == sizeof(*adsp_pdo_msg)) {
 			adsp_pdo_msg = data;
 			ack_set = true;
-			pr_info("[PD] %s adsp_rt1715_msg tcpc_pd_state = %d\n", __func__, adsp_pdo_msg->tcpc_pd_state);
+			pr_info("[PD] %s adsp_pdo_msg tcpc_pd_state = %d\n", __func__, adsp_pdo_msg->tcpc_pd_state);
 			for (i = 0; i < adsp_pdo_msg->nr; i++) {
 				pr_info("[PD] %s nr = %d, pdos = 0x%x\n", __func__, i, adsp_pdo_msg->pdos[i]);
 			}
+			pr_info("[PD] %s vid = 0x%04x\n", __func__, adsp_pdo_msg->vid);
+
 		} else {
 			pr_info("[PD] %s Incorrect response length %zu for MSG_OPCODE_RT_PDO\n", __func__, len);
 		}
 		break;
-	case MSG_OPCODE_RT_VID:
-		if (len == sizeof(*adsp_vid_msg)) {
-			adsp_vid_msg = data;
+	case MSG_OPCODE_RT_CUST_SRC:
+		if (len == sizeof(*adsp_cust_src_msg)) {
+			adsp_cust_src_msg = data;
 			ack_set = true;
-			pr_info("[PD] %s adsp_vid_msg vid = 0x%04x\n", __func__, adsp_vid_msg->vid);
+			pr_info("[PD] %s adsp_cust_src_msg cust_src = %d\n", __func__, adsp_cust_src_msg->cust_src);
 		} else {
-			pr_info("[PD] %s Incorrect response length %zu for MSG_OPCODE_RT_VID\n", __func__, len);
+			pr_info("[PD] %s Incorrect response length %zu for MSG_OPCODE_RT_CUST_SRC\n", __func__, len);
 		}
 		break;
 	case MSG_OPCODE_RT_RDO:
@@ -741,7 +752,7 @@ static void handle_message(struct rt_charger_info *info, void *data,
 			g_info->fixed_pdo = !(adsp_rdo_msg->bPPSSelected);
 			queue_delayed_work(rdo_wq, &rdo_work, 0);
 		} else {
-			pr_info("[PD] %s Incorrect response length %zu for MSG_OPCODE_RT_VID\n", __func__, len);
+			pr_info("[PD] %s Incorrect response length %zu for MSG_OPCODE_RT_RDO\n", __func__, len);
 		}
 		break;
 	case MSG_OPCODE_RT_APSD:
@@ -1070,7 +1081,7 @@ static int rt_charger_probe(struct platform_device *pdev)
 	}
 
 	/* Get tcpc device by tcpc_device'name */
-	info->tcpc = tcpc_dev_get_by_name("type_c_port0");
+	info->tcpc = tcpc_dev_get_by_name("typec");
 	if (!info->tcpc) {
 		dev_err(&pdev->dev, "get rt1711-tcpc fail\n");
 		//power_supply_unregister(&info->chg);

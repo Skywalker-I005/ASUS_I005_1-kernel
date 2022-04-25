@@ -1639,7 +1639,6 @@ static void ms51_resume_work(struct work_struct *work)
 	unsigned char ver_minor = 0;
 	unsigned char data[4] = {0};
 
-	wake_lock(&g_pdata->aura_wake_lock);
 	if(g_pdata->hw_stage < 5) {
 		if(!VDD_count){
 			err = regulator_enable(g_pdata->regulator_vdd);
@@ -1665,7 +1664,6 @@ static void ms51_resume_work(struct work_struct *work)
 	if (err != 1){
 		printk("[AURA_MS51] ms51_resume_work read FW:err %d\n", err);
 		mutex_unlock(&g_pdata->ms51_mutex);
-		wake_unlock(&g_pdata->aura_wake_lock);
 		return;
 	}
 	mutex_unlock(&g_pdata->ms51_mutex);
@@ -1673,7 +1671,6 @@ static void ms51_resume_work(struct work_struct *work)
 	ver_minor = data[1];
 
 	printk("[AURA_MS51] ms51_resume_work : FW version 0x%02x%02x\n", ver_major,ver_minor);
-	wake_unlock(&g_pdata->aura_wake_lock);
 }
 
 // Check FW work
@@ -1946,9 +1943,6 @@ static int ms51_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		goto unled;
 	}
 	INIT_WORK(&platform_data->resume_work, ms51_resume_work);
-
-// Init wake lock
-	wake_lock_init(&platform_data->aura_wake_lock, &client->dev, "aura_wake_lock");
 
 //#ifdef ASUS_FTM
 #if 0

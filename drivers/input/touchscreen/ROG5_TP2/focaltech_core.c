@@ -104,7 +104,7 @@ int fts_wait_tp_to_valid(void)
         if ((ret < 0) || (idh != chip_idh) || (idl != chip_idl)) {
             FTS_DEBUG("TP Not Ready,ReadData:0x%02x%02x", idh, idl);
         } else if ((idh == chip_idh) && (idl == chip_idl)) {
-            FTS_INFO("TP Ready,Device ID:0x%02x%02x", idh, idl);
+            FTS_DEBUG("TP Ready,Device ID:0x%02x%02x", idh, idl);
             return 0;
         }
         cnt++;
@@ -1501,16 +1501,16 @@ static int drm_notifier_callback(struct notifier_block *self,
     switch (*blank) {
     case DRM_PANEL_BLANK_UNBLANK:
         if (DRM_PANEL_EARLY_EVENT_BLANK == event) {
-            FTS_INFO("resume: event = %lu, not care", event);
+//            FTS_INFO("resume: event = %lu, not care", event);
         } else if (DRM_PANEL_EVENT_BLANK == event) {
 	    if (fts_data->asus_gesture_en == ENABLE){
-	        FTS_INFO("Back touch gesture mode enable , resume into gesture mode");
+//	        FTS_INFO("Back touch gesture mode enable , resume into gesture mode");
 		queue_work(fts_data->ts_workqueue, &fts_data->gesture_resume_work);
 		break;
 	    }
 
 	    if (fts_data->activate == DISABLE){
-	        FTS_INFO("Back touch not activate skip resume");
+//	        FTS_INFO("Back touch not activate skip resume");
 	    } else	    
 		queue_work(fts_data->ts_workqueue, &fts_data->resume_work);
 	}
@@ -1525,7 +1525,7 @@ static int drm_notifier_callback(struct notifier_block *self,
 	    }
 
 	    if (fts_data->activate == DISABLE){
-	        FTS_INFO("Back touch not activate skip suspend");
+//	        FTS_INFO("Back touch not activate skip suspend");
 	    } else {	    
 		cancel_work_sync(&fts_data->resume_work);
 		fts_ts_suspend(ts_data->dev);
@@ -1829,12 +1829,14 @@ err_report_buffer:
 err_input_init:
     if (ts_data->ts_workqueue)
         destroy_workqueue(ts_data->ts_workqueue);
+    if (ts_data->init_workqueue)
+	destroy_workqueue(ts_data->init_workqueue);
 err_bus_init:
     kfree_safe(ts_data->bus_tx_buf);
     kfree_safe(ts_data->bus_rx_buf);
     kfree_safe(ts_data->pdata);
     ts_data->init_success = 0;
-
+    
 //    FTS_FUNC_EXIT();
     return ret;
 }
@@ -1918,7 +1920,7 @@ static int fts_ts_suspend(struct device *dev)
 
     FTS_FUNC_ENTER();
     if (ts_data->suspended) {
-        FTS_INFO("Already in suspend state");
+//        FTS_INFO("Already in suspend state");
         return 0;
     }
 
@@ -1936,7 +1938,7 @@ static int fts_ts_suspend(struct device *dev)
     } else {
         fts_irq_disable();
 
-        FTS_INFO("make TP enter into sleep mode");
+        FTS_DEBUG("make TP enter into sleep mode");
         ret = fts_write_reg(FTS_REG_POWER_MODE, FTS_REG_POWER_MODE_SLEEP);
         if (ret < 0)
             FTS_ERROR("set TP to sleep mode fail, ret=%d", ret);

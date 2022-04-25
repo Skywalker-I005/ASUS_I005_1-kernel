@@ -87,10 +87,11 @@
 #define USB_HSPHY_1P8_VOL_MAX			1800000 /* uV */
 #define USB_HSPHY_1P8_HPM_LOAD			19000	/* uA */
 
+#define USB_HSPHY_VDD_HPM_LOAD			30000	/* uA */
+
 #if defined ASUS_ZS673KS_PROJECT && defined CONFIG_USB_HUB_USB3803
 extern int current_hub_mode;
 #endif
-#define USB_HSPHY_VDD_HPM_LOAD			30000	/* uA */
 
 struct msm_hsphy {
 	struct usb_phy		phy;

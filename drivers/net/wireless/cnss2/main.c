@@ -3188,6 +3188,8 @@ static int cnss_probe(struct platform_device *plat_dev)
 	struct cnss_plat_data *plat_priv;
 	const struct of_device_id *of_id;
 	const struct platform_device_id *device_id;
+	int retry = 0;
+
 	/* ASUS_BSP+++ "add for the antenna switch power (LDO13A)" */
 #if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT
 	struct device *dev;
@@ -3199,7 +3201,6 @@ static int cnss_probe(struct platform_device *plat_dev)
 #endif
 	/* ASUS_BSP--- "add for the antenna switch power (LDO13A)" */
 
-	int retry = 0;
 	if (cnss_get_plat_priv(plat_dev)) {
 		cnss_pr_err("Driver is already initialized!\n");
 		ret = -EEXIST;

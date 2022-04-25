@@ -344,7 +344,6 @@ static ssize_t devpath_show(struct device *dev, struct device_attribute *attr, c
 static DEVICE_ATTR_RO(devpath);
 /*AS-K ASUS SSR and Debug - devpath---*/
 #endif
-
 int subsys_get_restart_level(struct subsys_device *dev)
 {
 	return dev->restart_level;

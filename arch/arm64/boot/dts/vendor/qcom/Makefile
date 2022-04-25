@@ -23,6 +23,16 @@ dtbo-$(CONFIG_ARCH_LAHAINA) += \
                 ZS673KS-MP3-overlay.dtbo \
                 ZS673KS-MP4-overlay.dtbo \
                 ZS673KS-MP5-overlay.dtbo \
+                ZS676KS-ERC-ER-overlay.dtbo \
+                ZS676KS-ERC-PR-overlay.dtbo \
+                ZS676KS-ERC-MP-overlay.dtbo \
+                ZS676KS-ERA-ER-overlay.dtbo \
+                ZS676KS-ER-overlay.dtbo \
+                ZS676KS-PR-overlay.dtbo \
+                ZS676KS-MP-overlay.dtbo \
+                ZS676KS-PX-ER-overlay.dtbo \
+                ZS676KS-PX-PR-overlay.dtbo \
+                ZS676KS-PX-MP-overlay.dtbo \
 
 lahaina-mtp-overlay.dtbo-base := lahaina.dtb lahaina-v2.dtb lahaina-v2.1.dtb
 ZS673KS-EVB-overlay.dtbo-base := lahaina.dtb lahaina-v2.dtb lahaina-v2.1.dtb
@@ -35,46 +45,17 @@ ZS673KS-MP-overlay.dtbo-base := lahaina.dtb lahaina-v2.dtb lahaina-v2.1.dtb
 ZS673KS-MP3-overlay.dtbo-base := lahaina.dtb lahaina-v2.dtb lahaina-v2.1.dtb
 ZS673KS-MP4-overlay.dtbo-base := lahaina.dtb lahaina-v2.dtb lahaina-v2.1.dtb
 ZS673KS-MP5-overlay.dtbo-base := lahaina.dtb lahaina-v2.dtb lahaina-v2.1.dtb
+ZS676KS-ERC-ER-overlay.dtbo-base := lahaina.dtb lahaina-v2.dtb lahaina-v2.1.dtb
+ZS676KS-ERC-PR-overlay.dtbo-base := lahaina.dtb lahaina-v2.dtb lahaina-v2.1.dtb
+ZS676KS-ERC-MP-overlay.dtbo-base := lahaina.dtb lahaina-v2.dtb lahaina-v2.1.dtb
+ZS676KS-ERA-ER-overlay.dtbo-base := lahaina.dtb lahaina-v2.dtb lahaina-v2.1.dtb
+ZS676KS-ER-overlay.dtbo-base := lahaina.dtb lahaina-v2.dtb lahaina-v2.1.dtb
+ZS676KS-PR-overlay.dtbo-base := lahaina.dtb lahaina-v2.dtb lahaina-v2.1.dtb
+ZS676KS-MP-overlay.dtbo-base := lahaina.dtb lahaina-v2.dtb lahaina-v2.1.dtb
+ZS676KS-PX-ER-overlay.dtbo-base := lahaina.dtb lahaina-v2.dtb lahaina-v2.1.dtb
+ZS676KS-PX-PR-overlay.dtbo-base := lahaina.dtb lahaina-v2.dtb lahaina-v2.1.dtb
+ZS676KS-PX-MP-overlay.dtbo-base := lahaina.dtb lahaina-v2.dtb lahaina-v2.1.dtb
 
-else ifneq (,$(filter PICASSO,$(ASUS_BUILD_PROJECT)))
-
-dtbo-$(CONFIG_ARCH_LAHAINA) += \
-                PICASSO-EVB-overlay.dtbo \
-                PICASSO-EVB2-overlay.dtbo \
-                PICASSO-SR1-overlay.dtbo \
-                PICASSO-ER1-overlay.dtbo \
-
-PICASSO-EVB-overlay.dtbo-base := lahaina.dtb lahaina-v2.dtb lahaina-v2.1.dtb
-PICASSO-EVB2-overlay.dtbo-base := lahaina.dtb lahaina-v2.dtb lahaina-v2.1.dtb
-PICASSO-SR1-overlay.dtbo-base := lahaina.dtb lahaina-v2.dtb lahaina-v2.1.dtb
-PICASSO-ER1-overlay.dtbo-base := lahaina.dtb lahaina-v2.dtb lahaina-v2.1.dtb
-
-
-else ifneq (,$(filter SAKE,$(ASUS_BUILD_PROJECT)))
-$(warning build dtbo for SAKE...)
-
-dtbo-$(CONFIG_ARCH_LAHAINA) += \
-                SAKE-EVB-overlay.dtbo \
-                SAKE-EVB2-overlay.dtbo \
-                SAKE-SR1-overlay.dtbo \
-
-lahaina-mtp-overlay.dtbo-base := lahaina.dtb lahaina-v2.dtb lahaina-v2.1.dtb
-SAKE-EVB-overlay.dtbo-base := lahaina.dtb lahaina-v2.dtb lahaina-v2.1.dtb
-SAKE-EVB2-overlay.dtbo-base := lahaina.dtb lahaina-v2.dtb lahaina-v2.1.dtb
-SAKE-SR1-overlay.dtbo-base := lahaina.dtb lahaina-v2.dtb lahaina-v2.1.dtb	
-else ifneq (,$(filter VODKA,$(ASUS_BUILD_PROJECT)))
-$(warning build dtbo for VODKA...)
-
-dtbo-$(CONFIG_ARCH_LAHAINA) += \
-                VODKA-EVB-overlay.dtbo \
-                VODKA-EVB2-overlay.dtbo \
-                VODKA-SR1-overlay.dtbo \
-
-lahaina-mtp-overlay.dtbo-base := lahaina.dtb lahaina-v2.dtb lahaina-v2.1.dtb
-VODKA-EVB-overlay.dtbo-base := lahaina.dtb lahaina-v2.dtb lahaina-v2.1.dtb
-VODKA-EVB2-overlay.dtbo-base := lahaina.dtb lahaina-v2.dtb lahaina-v2.1.dtb
-VODKA-SR1-overlay.dtbo-base := lahaina.dtb lahaina-v2.dtb lahaina-v2.1.dtb
-# --- ASUS_BSP : add for asus dtbo
 else
 dtbo-$(CONFIG_ARCH_LAHAINA) += lahaina-rumi-overlay.dtbo \
 	lahaina-mtp-overlay.dtbo \

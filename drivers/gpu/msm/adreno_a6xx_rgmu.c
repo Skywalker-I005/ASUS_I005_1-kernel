@@ -146,6 +146,9 @@ static int a6xx_rgmu_oob_set(struct kgsl_device *device,
 	struct a6xx_rgmu_device *rgmu = to_a6xx_rgmu(ADRENO_DEVICE(device));
 	int ret, set, check;
 
+	if (req == oob_perfcntr && rgmu->num_oob_perfcntr++)
+		return 0;
+
 	set = BIT(req + 16);
 	check = BIT(req + 16);
 
@@ -160,6 +163,8 @@ static int a6xx_rgmu_oob_set(struct kgsl_device *device,
 	if (ret) {
 		unsigned int status;
 
+		if (req == oob_perfcntr)
+			rgmu->num_oob_perfcntr--;
 		gmu_core_regread(device, A6XX_RGMU_CX_PCC_DEBUG, &status);
 		dev_err(&rgmu->pdev->dev,
 				"Timed out while setting OOB req:%s status:0x%x\n",
@@ -181,6 +186,11 @@ static int a6xx_rgmu_oob_set(struct kgsl_device *device,
 static void a6xx_rgmu_oob_clear(struct kgsl_device *device,
 		enum oob_request req)
 {
+	struct a6xx_rgmu_device *rgmu = to_a6xx_rgmu(ADRENO_DEVICE(device));
+
+	if (req == oob_perfcntr && --rgmu->num_oob_perfcntr)
+		return;
+
 	gmu_core_regwrite(device, A6XX_GMU_HOST2GMU_INTR_SET, BIT(req + 24));
 	trace_kgsl_gmu_oob_clear(BIT(req + 24));
 }
@@ -1039,6 +1049,15 @@ static int a6xx_power_off(struct adreno_device *adreno_dev)
 	int ret;
 
 	if (!test_bit(RGMU_PRIV_GPU_STARTED, &rgmu->flags))
+		return 0;
+
+	/*
+	* If this config is enabled, the smmu driver keeps the cx gdsc always
+	* ON. So it is better if we don't turn off the GPU unless we are
+	* really desperate like in the case of gpu recovery. In that case, the
+	* power off is handled by a different path.
+	*/
+	if (IS_ENABLED(CONFIG_ARM_SMMU_POWER_ALWAYS_ON))
 		return 0;
 
 	trace_kgsl_pwr_request_state(device, KGSL_STATE_SLUMBER);

@@ -816,7 +816,7 @@ void save_last_shutdown_log(char *filename)
 	char *last_logcat_buffer;
 	ulong *printk_buffer_slot2_addr = (ulong *)PRINTK_BUFFER_SLOT2;
 	int fd_kmsg, fd_logcat;
-	ulong printk_buffer_index;
+	//ulong printk_buffer_index;
 	/* ASUS_BSP Paul --- */
 
 	t = cpu_clock(0);
@@ -863,9 +863,9 @@ void save_last_shutdown_log(char *filename)
 	}
 	/* ASUS_BSP Paul +++ */
 
-	printk_buffer_index = *(printk_buffer_slot2_addr + 1);
 
-		fd_kmsg = ksys_open("/asdf/last_kmsg", O_CREAT | O_RDWR | O_SYNC, S_IWUGO | S_IRUGO);
+
+		fd_kmsg = ksys_open("/asdf/last_kmsg", O_CREAT | O_RDWR | O_SYNC,S_IWUGO | S_IRUGO);
 		if (!IS_ERR((const void *)(ulong)fd_kmsg)) {
 			ksys_write(fd_kmsg, (unsigned char *)last_shutdown_log, PRINTK_BUFFER_SLOT_SIZE);
 			ksys_close(fd_kmsg);
@@ -1532,7 +1532,11 @@ static ssize_t asusdebug_write(struct file *file, const char __user *buf, size_t
 		delta_all_thread_info();
 		save_phone_hang_log(1);
 		return count;
+	}else if (strncmp(messages, "savelastshutdown", strlen("savelastshutdown")) == 0) {
+		printk("start save last shutdown\n");
+		save_last_shutdown_log("LastShutdown");
 	}
+
 
 	return count;
 }

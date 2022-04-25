@@ -66,7 +66,7 @@ int asus_gesture_readdata(struct fts_ts_data *ts_data, u8 *data)
     }
 
     if (gesture_id_1!=0x00)
-      FTS_INFO("gesture_id 1 =0x%2x ",gesture_id_1);
+      FTS_DEBUG("gesture_id 1 =0x%2x ",gesture_id_1);
     
     asus_gesture_report(ts_data,gesture_id_1);
 	
@@ -77,7 +77,7 @@ int asus_gesture_readdata(struct fts_ts_data *ts_data, u8 *data)
 	    return 1;
 	}
         if (gesture_id_1!=0x00)
-	    FTS_INFO("gesture_id 2 =0x%x ",gesture_id_2);
+	    FTS_DEBUG("gesture_id 2 =0x%x ",gesture_id_2);
 	
 	asus_gesture_report(ts_data,gesture_id_2);
     }
@@ -100,13 +100,13 @@ static ssize_t asus_ex_proc_bktp_gesture_read(struct file *file, char __user *bu
 		return -ENOMEM;
 	
         ret0 =fts_read_reg(READ_FIG_NUM_REG, &fig_num);
-        FTS_INFO("fig number %d",fig_num);
+        FTS_DEBUG("fig number %d",fig_num);
             
         ret0 =fts_read_reg(READ_GESTURE_1_REG, &gesture_id_1);
-        FTS_INFO("gesture_id 1 =0x%x ",gesture_id_1);
+        FTS_DEBUG("gesture_id 1 =0x%x ",gesture_id_1);
         if (fig_num == 2) {
 	  ret0 =fts_read_reg(READ_GESTURE_2_REG, &gesture_id_2);
-	  FTS_INFO("gesture_id 2 =0x%x ",gesture_id_2);
+	  FTS_DEBUG("gesture_id 2 =0x%x ",gesture_id_2);
         }
 
 	len += snprintf(buff + len, PAGE_SIZE, "0x%x,0x%x\n",gesture_id_1,gesture_id_2);

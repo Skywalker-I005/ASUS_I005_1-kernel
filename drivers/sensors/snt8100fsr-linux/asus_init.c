@@ -462,6 +462,6 @@ void asus_init_probe(void){
 #ifdef ASUS_ZS673KS_PROJECT
 	create_Grip_Cal_Read_proc_file();
 #endif
-
+	create_Grip_ID_status_proc_file();
 }
 
